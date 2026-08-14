@@ -51,6 +51,7 @@ class OBSAbout;
 class OBSBasicAdvAudio;
 class OBSBasicFilters;
 class OBSBasicInteraction;
+class OBSBasicLayouts;
 class OBSBasicProperties;
 class OBSBasicSourceSelect;
 class OBSBasicTransform;
@@ -575,6 +576,7 @@ private:
 	QPointer<OBSBasicInteraction> interaction;
 	QPointer<OBSBasicProperties> properties;
 	QPointer<OBSBasicTransform> transformWindow;
+	QPointer<OBSBasicLayouts> layoutsWindow;
 	QPointer<OBSBasicAdvAudio> advAudioWindow;
 	QPointer<OBSBasicFilters> filters;
 	QPointer<OBSAbout> about;
@@ -1208,6 +1210,7 @@ private slots:
 	void on_actionHorizontalCenter_triggered();
 
 	void on_actionEditTransform_triggered();
+	void on_actionSceneLayouts_triggered();
 
 	void on_sources_customContextMenuRequested(const QPoint &pos);
 

@@ -25,6 +25,7 @@
 #include <dialogs/OBSBasicAdvAudio.hpp>
 #include <dialogs/OBSBasicFilters.hpp>
 #include <dialogs/OBSBasicInteraction.hpp>
+#include <dialogs/OBSBasicLayouts.hpp>
 #include <dialogs/OBSBasicProperties.hpp>
 #include <dialogs/OBSBasicTransform.hpp>
 #ifdef ENABLE_IDIAN_PLAYGROUND
@@ -514,6 +515,22 @@ void OBSBasic::CreateEditTransformWindow(obs_sceneitem_t *item)
 	connect(ui->scenes, &QListWidget::currentItemChanged, transformWindow, &OBSBasicTransform::onSceneChanged);
 	transformWindow->show();
 	transformWindow->setAttribute(Qt::WA_DeleteOnClose, true);
+}
+
+void OBSBasic::on_actionSceneLayouts_triggered()
+{
+	/* The dialog is modeless so a layout can be tweaked while watching the
+	 * preview, so an already open one is raised instead of duplicated. */
+	if (layoutsWindow) {
+		layoutsWindow->show();
+		layoutsWindow->raise();
+		layoutsWindow->activateWindow();
+		return;
+	}
+
+	layoutsWindow = new OBSBasicLayouts(this);
+	layoutsWindow->setAttribute(Qt::WA_DeleteOnClose, true);
+	layoutsWindow->show();
 }
 
 void OBSBasic::on_actionFullscreenInterface_triggered()

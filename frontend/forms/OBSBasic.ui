@@ -866,6 +866,7 @@
     <addaction name="transformMenu"/>
     <addaction name="orderMenu"/>
     <addaction name="scalingMenu"/>
+    <addaction name="actionSceneLayouts"/>
     <addaction name="actionLockPreview"/>
     <addaction name="separator"/>
     <addaction name="actionAdvAudioProperties"/>
@@ -1709,6 +1710,11 @@
    </property>
    <property name="text">
     <string>Basic.MainMenu.Edit.Redo</string>
+   </property>
+  </action>
+  <action name="actionSceneLayouts">
+   <property name="text">
+    <string>Basic.MainMenu.Edit.SceneLayouts</string>
    </property>
   </action>
   <action name="actionEditTransform">

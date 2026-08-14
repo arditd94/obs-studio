@@ -46,6 +46,8 @@ target_sources(
     components/GameCaptureToolbar.hpp
     components/ImageSourceToolbar.cpp
     components/ImageSourceToolbar.hpp
+    components/LayoutView.cpp
+    components/LayoutView.hpp
     components/MediaControls.cpp
     components/MediaControls.hpp
     components/MenuButton.cpp
@@ -63,6 +65,8 @@ target_sources(
     components/OBSPreviewScalingLabel.hpp
     components/OBSSourceLabel.cpp
     components/OBSSourceLabel.hpp
+    components/SceneLayout.cpp
+    components/SceneLayout.hpp
     components/SceneTree.cpp
     components/SceneTree.hpp
     components/SilentUpdateCheckBox.hpp

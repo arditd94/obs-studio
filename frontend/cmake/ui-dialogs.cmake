@@ -27,6 +27,8 @@ target_sources(
     dialogs/OBSBasicFilters.hpp
     dialogs/OBSBasicInteraction.cpp
     dialogs/OBSBasicInteraction.hpp
+    dialogs/OBSBasicLayouts.cpp
+    dialogs/OBSBasicLayouts.hpp
     dialogs/OBSBasicProperties.cpp
     dialogs/OBSBasicProperties.hpp
     dialogs/OBSBasicSourceSelect.cpp
