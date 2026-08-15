@@ -24,12 +24,14 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QDropEvent>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
 #include <QSet>
 #include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QVBoxLayout>
 
 OBSBasicProjections::OBSBasicProjections(OBSBasic *parent) : QDialog(parent), main(parent)
@@ -48,15 +50,26 @@ OBSBasicProjections::OBSBasicProjections(OBSBasic *parent) : QDialog(parent), ma
 
 void OBSBasicProjections::BuildUI()
 {
-	table = new QTableWidget(0, 3, this);
-	table->setHorizontalHeaderLabels(
-		{QTStr("Basic.Projections.Content"), QTStr("Basic.Projections.Screen"), QTStr("Basic.Projections.On")});
-	table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+	table = new QTableWidget(0, 4, this);
+	table->setHorizontalHeaderLabels({QTStr("Basic.Projections.Layer"), QTStr("Basic.Projections.Content"),
+					  QTStr("Basic.Projections.Screen"), QTStr("Basic.Projections.On")});
+	/* The first column stays a plain item on purpose: every other cell holds
+	 * a widget that would swallow the press, leaving nothing to drag a row
+	 * by. */
+	table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-	table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+	table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+	table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
 	table->verticalHeader()->setVisible(false);
 	table->setSelectionBehavior(QAbstractItemView::SelectRows);
 	table->setSelectionMode(QAbstractItemView::SingleSelection);
+
+	/* Rows are layers, so they can be dragged into order. The drop is
+	 * handled here rather than by the view because the cell widgets do not
+	 * travel with a row the view moves itself. */
+	table->setDragDropMode(QAbstractItemView::InternalMove);
+	table->setDragDropOverwriteMode(false);
+	table->viewport()->installEventFilter(this);
 
 	QPushButton *addButton = new QPushButton(QTStr("Basic.Projections.Add"), this);
 	removeButton = new QPushButton(QTStr("Basic.Projections.Remove"), this);
@@ -170,15 +183,27 @@ void OBSBasicProjections::Refresh()
 
 	for (int row = 0; row < entries.size(); row++) {
 		table->insertRow(row);
-		table->setCellWidget(row, 0, CreateSceneCombo(entries[row].sceneUuid, row));
-		table->setCellWidget(row, 1, CreateMonitorCombo(entries[row].monitor, row));
+
+		QTableWidgetItem *handle = new QTableWidgetItem(QString::number(row + 1));
+		handle->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled);
+		handle->setTextAlignment(Qt::AlignCenter);
+		handle->setToolTip(QTStr("Basic.Projections.DragHint"));
+		table->setItem(row, 0, handle);
+
+		table->setCellWidget(row, 1, CreateSceneCombo(entries[row].sceneUuid, row));
+		table->setCellWidget(row, 2, CreateMonitorCombo(entries[row].monitor, row));
 
 		QCheckBox *check = new QCheckBox();
-		check->setChecked(main->IsProjectionActive(row));
+		check->setChecked(entries[row].enabled);
+
+		/* A line can be enabled yet hidden behind a layer in front of
+		 * it, so the tooltip says which of the two it is. */
+		check->setToolTip(main->IsProjectionShown(row) ? QTStr("Basic.Projections.OnAir")
+							      : QTStr("Basic.Projections.Covered"));
 
 		connect(check, &QCheckBox::toggled, this, [this, row](bool on) {
 			if (!refreshing) {
-				main->SetProjectionActive(row, on);
+				main->SetProjectionEnabled(row, on);
 			}
 		});
 
@@ -190,7 +215,7 @@ void OBSBasicProjections::Refresh()
 		holderLayout->setAlignment(Qt::AlignCenter);
 		holderLayout->addWidget(check);
 
-		table->setCellWidget(row, 2, holder);
+		table->setCellWidget(row, 3, holder);
 	}
 
 	removeButton->setEnabled(table->rowCount() > 0);
@@ -206,8 +231,8 @@ void OBSBasicProjections::CommitRow(int row)
 		return;
 	}
 
-	QComboBox *sceneCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 0));
-	QComboBox *monitorCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 1));
+	QComboBox *sceneCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 1));
+	QComboBox *monitorCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 2));
 
 	if (!sceneCombo || !monitorCombo) {
 		return;
@@ -224,21 +249,36 @@ void OBSBasicProjections::CommitRow(int row)
 
 void OBSBasicProjections::UpdateWarning()
 {
-	QSet<int> seen;
-	bool duplicate = false;
+	/* Several lines on one screen is the point rather than a mistake: the
+	 * hint explains which one wins. */
+	warningLabel->setText(QTStr("Basic.Projections.LayerHint"));
+}
 
-	for (const ProjectionEntry &entry : main->GetProjections()) {
-		if (seen.contains(entry.monitor)) {
-			duplicate = true;
-			break;
+bool OBSBasicProjections::eventFilter(QObject *watched, QEvent *event)
+{
+	if (watched == table->viewport() && event->type() == QEvent::Drop) {
+		QDropEvent *drop = static_cast<QDropEvent *>(event);
+		const int from = table->currentRow();
+
+		QModelIndex target = table->indexAt(drop->position().toPoint());
+		int to = target.isValid() ? target.row() : table->rowCount();
+
+		/* Dropping on the lower half of a row means after it. */
+		if (target.isValid()) {
+			const QRect rect = table->visualRect(target);
+
+			if (drop->position().toPoint().y() > rect.center().y()) {
+				to += 1;
+			}
 		}
 
-		seen.insert(entry.monitor);
+		main->MoveProjectionEntry(from, to);
+
+		drop->accept();
+		return true;
 	}
 
-	/* A screen can only show one thing, so a duplicate is flagged rather
-	 * than silently dropped when the projection starts. */
-	warningLabel->setText(duplicate ? QTStr("Basic.Projections.DuplicateScreen") : QString());
+	return QDialog::eventFilter(watched, event);
 }
 
 void OBSBasicProjections::OnAdd()
@@ -246,6 +286,7 @@ void OBSBasicProjections::OnAdd()
 	ProjectionEntry entry;
 	entry.sceneUuid = QString();
 	entry.monitor = 0;
+	entry.enabled = true;
 
 	main->AddProjectionEntry(entry);
 

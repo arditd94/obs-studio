@@ -298,119 +298,159 @@ static uint32_t ProjectionFadeMs()
 	return (uint32_t)config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration");
 }
 
-bool OBSBasic::IsProjectionActive(int index) const
-{
-	return index >= 0 && index < projectOutputs.size() && !projectOutputs[index].isNull();
-}
-
-void OBSBasic::SetProjectionActive(int index, bool active)
+bool OBSBasic::IsProjectionShown(int index) const
 {
 	if (index < 0 || index >= projectionEntries.size()) {
-		return;
+		return false;
 	}
 
-	while (projectOutputs.size() < projectionEntries.size()) {
-		projectOutputs.append(QPointer<OBSProjector>());
-	}
+	const int monitor = projectionEntries[index].monitor;
 
-	if (active == IsProjectionActive(index)) {
-		return;
-	}
+	return monitorEntries.value(monitor, -1) == index && !monitorProjectors.value(monitor).isNull();
+}
 
-	const uint32_t fadeMs = ProjectionFadeMs();
+void OBSBasic::CloseMonitorProjector(int monitor)
+{
+	OBSProjector *projector = monitorProjectors.value(monitor);
 
-	if (!active) {
-		OBSProjector *projector = projectOutputs[index];
-		projectOutputs[index] = nullptr;
-
-		if (projector) {
-			if (fadeMs == 0) {
-				DeleteProjector(projector);
-			} else {
-				/* Hold the window open until the fade to black has
-				 * finished, otherwise closing it would be the very
-				 * cut the fade exists to avoid. */
-				projector->StartFade(false, fadeMs);
-
-				QTimer::singleShot((int)fadeMs, this, [this, projector]() {
-					for (OBSProjector *existing : projectors) {
-						if (existing == projector) {
-							DeleteProjector(projector);
-							break;
-						}
-					}
-				});
-			}
-		}
-
-		UpdateProjectButtonState();
-		emit projectionsChanged();
-		return;
-	}
-
-	const ProjectionEntry &entry = projectionEntries[index];
-
-	/* A screen can only show one thing, so an entry whose monitor is already
-	 * busy is left off rather than stealing the screen. */
-	for (int i = 0; i < projectionEntries.size(); i++) {
-		if (i != index && IsProjectionActive(i) && projectionEntries[i].monitor == entry.monitor) {
-			return;
-		}
-	}
-
-	OBSProjector *projector = nullptr;
-
-	if (entry.sceneUuid.isEmpty()) {
-		/* Preview without a source renders the main texture, so the screen
-		 * follows the program through transitions. */
-		projector = OpenProjector(nullptr, entry.monitor, ProjectorType::Preview);
-	} else {
-		OBSSourceAutoRelease scene = obs_get_source_by_uuid(QT_TO_UTF8(entry.sceneUuid));
-
-		if (!scene) {
-			return;
-		}
-
-		projector = OpenProjector(scene.Get(), entry.monitor, ProjectorType::Scene);
-	}
+	monitorProjectors.remove(monitor);
+	monitorEntries.remove(monitor);
 
 	if (!projector) {
 		return;
 	}
 
-	projector->StartFade(true, fadeMs);
+	const uint32_t fadeMs = ProjectionFadeMs();
 
-	/* A projector can also be dismissed with Escape or its close box, which
-	 * must leave the panel and the button in step with reality. */
-	connect(projector, &QObject::destroyed, this, &OBSBasic::ProjectionClosed);
+	if (fadeMs == 0) {
+		DeleteProjector(projector);
+		return;
+	}
 
-	projectOutputs[index] = projector;
+	/* Hold the window open until the fade to black has finished, otherwise
+	 * closing it would be the very cut the fade exists to avoid. */
+	projector->StartFade(false, fadeMs);
+
+	QTimer::singleShot((int)fadeMs, this, [this, projector]() {
+		for (OBSProjector *existing : projectors) {
+			if (existing == projector) {
+				DeleteProjector(projector);
+				break;
+			}
+		}
+	});
+}
+
+void OBSBasic::RefreshProjections()
+{
+	const uint32_t fadeMs = ProjectionFadeMs();
+
+	/* Work out what belongs on each screen: the first enabled line wins,
+	 * since the top of the list is the front of the stack. */
+	QHash<int, int> wanted;
+
+	if (projectionsRunning) {
+		for (int i = 0; i < projectionEntries.size(); i++) {
+			const ProjectionEntry &entry = projectionEntries[i];
+
+			if (!entry.enabled || wanted.contains(entry.monitor)) {
+				continue;
+			}
+
+			wanted.insert(entry.monitor, i);
+		}
+	}
+
+	/* Screens that should no longer show anything, or should show a
+	 * different layer, give up their projector first. */
+	const QList<int> current = monitorProjectors.keys();
+
+	for (int monitor : current) {
+		const int wantedIndex = wanted.value(monitor, -1);
+
+		if (wantedIndex == monitorEntries.value(monitor, -1) && !monitorProjectors.value(monitor).isNull()) {
+			continue;
+		}
+
+		CloseMonitorProjector(monitor);
+	}
+
+	for (auto it = wanted.constBegin(); it != wanted.constEnd(); ++it) {
+		const int monitor = it.key();
+		const int index = it.value();
+
+		if (!monitorProjectors.value(monitor).isNull()) {
+			continue;
+		}
+
+		const ProjectionEntry &entry = projectionEntries[index];
+		OBSProjector *projector = nullptr;
+
+		if (entry.sceneUuid.isEmpty()) {
+			/* Preview without a source renders the main texture, so
+			 * the screen follows the program through transitions. */
+			projector = OpenProjector(nullptr, monitor, ProjectorType::Preview);
+		} else {
+			OBSSourceAutoRelease scene = obs_get_source_by_uuid(QT_TO_UTF8(entry.sceneUuid));
+
+			if (!scene) {
+				continue;
+			}
+
+			projector = OpenProjector(scene.Get(), monitor, ProjectorType::Scene);
+		}
+
+		if (!projector) {
+			continue;
+		}
+
+		projector->StartFade(true, fadeMs);
+
+		/* A projector can also be dismissed with Escape or its close
+		 * box, which must leave the panel and the button in step. */
+		connect(projector, &QObject::destroyed, this, &OBSBasic::ProjectionClosed);
+
+		monitorProjectors.insert(monitor, projector);
+		monitorEntries.insert(monitor, index);
+	}
 
 	UpdateProjectButtonState();
 	emit projectionsChanged();
 }
 
-void OBSBasic::StartProjections()
+void OBSBasic::SetProjectionEnabled(int index, bool enabled)
 {
-	for (int i = 0; i < projectionEntries.size(); i++) {
-		SetProjectionActive(i, true);
+	if (index < 0 || index >= projectionEntries.size() || projectionEntries[index].enabled == enabled) {
+		return;
 	}
+
+	projectionEntries[index].enabled = enabled;
+	SaveProjections();
+	RefreshProjections();
 }
 
-void OBSBasic::StopProjections()
+void OBSBasic::MoveProjectionEntry(int from, int to)
 {
-	for (int i = 0; i < projectionEntries.size(); i++) {
-		SetProjectionActive(i, false);
+	if (from < 0 || from >= projectionEntries.size() || to < 0 || to > projectionEntries.size() || from == to) {
+		return;
 	}
+
+	projectionEntries.move(from, to > from ? to - 1 : to);
+	SaveProjections();
+
+	/* Reordering changes which layer is at the front, so the screens are
+	 * recomputed straight away. */
+	RefreshProjections();
 }
 
 void OBSBasic::AddProjectionEntry(const ProjectionEntry &entry)
 {
-	projectionEntries.append(entry);
-	projectOutputs.append(QPointer<OBSProjector>());
+	/* New lines go to the front of the stack, matching how a new source
+	 * lands on top of a scene. */
+	projectionEntries.prepend(entry);
 
 	SaveProjections();
-	emit projectionsChanged();
+	RefreshProjections();
 }
 
 void OBSBasic::RemoveProjectionEntry(int index)
@@ -419,16 +459,10 @@ void OBSBasic::RemoveProjectionEntry(int index)
 		return;
 	}
 
-	SetProjectionActive(index, false);
-
 	projectionEntries.removeAt(index);
 
-	if (index < projectOutputs.size()) {
-		projectOutputs.removeAt(index);
-	}
-
 	SaveProjections();
-	emit projectionsChanged();
+	RefreshProjections();
 }
 
 void OBSBasic::SetProjectionEntry(int index, const ProjectionEntry &entry)
@@ -437,29 +471,20 @@ void OBSBasic::SetProjectionEntry(int index, const ProjectionEntry &entry)
 		return;
 	}
 
-	/* Editing a running line restarts it, so the change lands on the screen
-	 * straight away instead of at the next master toggle. */
-	const bool wasActive = IsProjectionActive(index);
-
-	if (wasActive) {
-		SetProjectionActive(index, false);
-	}
+	const bool enabled = projectionEntries[index].enabled;
 
 	projectionEntries[index] = entry;
+	projectionEntries[index].enabled = enabled;
+
 	SaveProjections();
-
-	if (wasActive) {
-		SetProjectionActive(index, true);
-	}
-
-	emit projectionsChanged();
+	RefreshProjections();
 }
 
 void OBSBasic::UpdateProjectButtonState()
 {
 	bool any = false;
 
-	for (const QPointer<OBSProjector> &pointer : projectOutputs) {
+	for (const QPointer<OBSProjector> &pointer : monitorProjectors) {
 		if (!pointer.isNull()) {
 			any = true;
 			break;
@@ -475,10 +500,17 @@ void OBSBasic::ProjectionClosed(QObject *projector)
 {
 	/* The guarded pointer is not necessarily cleared yet when destroyed()
 	 * fires, so the entry is matched on the raw pointer instead. */
-	for (int i = 0; i < projectOutputs.size(); i++) {
-		if (projectOutputs[i].data() == projector) {
-			projectOutputs[i] = nullptr;
+	const QList<int> monitors = monitorProjectors.keys();
+
+	for (int monitor : monitors) {
+		if (monitorProjectors.value(monitor).data() == projector) {
+			monitorProjectors.remove(monitor);
+			monitorEntries.remove(monitor);
 		}
+	}
+
+	if (monitorProjectors.isEmpty()) {
+		projectionsRunning = false;
 	}
 
 	UpdateProjectButtonState();
@@ -495,27 +527,21 @@ void OBSBasic::on_projectButton_toggled(bool checked)
 			return;
 		}
 
-		StartProjections();
+		projectionsRunning = true;
+		RefreshProjections();
 
-		bool any = false;
-
-		for (const QPointer<OBSProjector> &pointer : projectOutputs) {
-			if (!pointer.isNull()) {
-				any = true;
-				break;
-			}
-		}
-
-		if (!any) {
+		if (monitorProjectors.isEmpty()) {
+			projectionsRunning = false;
 			QSignalBlocker block(ui->projectButton);
 			ui->projectButton->setChecked(false);
-			OBSMessageBox::warning(this, QTStr("Basic.Project"), QTStr("Basic.Project.NoMonitor"));
+			OBSMessageBox::warning(this, QTStr("Basic.Project"), QTStr("Basic.Project.NoEnabled"));
 		}
 
 		return;
 	}
 
-	StopProjections();
+	projectionsRunning = false;
+	RefreshProjections();
 }
 
 void OBSBasic::SetProjectButtonActive(bool active)
@@ -544,7 +570,6 @@ void OBSBasic::on_projectSettingsButton_clicked()
 void OBSBasic::LoadProjections()
 {
 	projectionEntries.clear();
-	projectOutputs.clear();
 
 	const char *jsonStr = config_get_string(App()->GetUserConfig(), "BasicWindow", "Projections");
 
@@ -563,9 +588,9 @@ void OBSBasic::LoadProjections()
 		ProjectionEntry entry;
 		entry.sceneUuid = QString::fromStdString(item["scene"].string_value());
 		entry.monitor = item["monitor"].int_value();
+		entry.enabled = item["enabled"].bool_value();
 
 		projectionEntries.append(entry);
-		projectOutputs.append(QPointer<OBSProjector>());
 	}
 }
 
@@ -577,6 +602,7 @@ void OBSBasic::SaveProjections()
 		array.push_back(Json::object{
 			{"scene", QT_TO_UTF8(entry.sceneUuid)},
 			{"monitor", entry.monitor},
+			{"enabled", entry.enabled},
 		});
 	}
 

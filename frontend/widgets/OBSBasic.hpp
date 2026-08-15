@@ -98,10 +98,15 @@ enum class QtDataRole {
 };
 
 /* One line of the projection panel: which scene goes to which screen. An empty
- * sceneUuid means the program output, which follows scene changes. */
+ * sceneUuid means the program output, which follows scene changes.
+ *
+ * Lines targeting the same screen stack like layers, the first one in the list
+ * being the front. Switching off a layer reveals the one beneath, which is what
+ * lets an event backdrop sit permanently under a talk. */
 struct ProjectionEntry {
 	QString sceneUuid;
 	int monitor = 0;
+	bool enabled = false;
 };
 
 struct SavedProjectorInfo {
@@ -974,6 +979,13 @@ private:
 
 	QList<ProjectionEntry> projectionEntries;
 
+	/* One projector per screen, holding whichever layer is currently at the
+	 * front of that screen. */
+	QHash<int, QPointer<OBSProjector>> monitorProjectors;
+	QHash<int, int> monitorEntries;
+
+	bool projectionsRunning = false;
+
 	QPointer<OBSBasicProjections> projectionsDialog;
 	QPointer<QMenu> previewProjector;
 	QPointer<QMenu> previewProjectorSource;
@@ -1002,16 +1014,20 @@ private slots:
 	void SetProjectButtonActive(bool active);
 	void UpdateProjectButtonState();
 
-	void StartProjections();
-	void StopProjections();
+	void RefreshProjections();
+	void CloseMonitorProjector(int monitor);
 
 public:
 	/* Read and edited by the projection panel. Each entry has an optional
 	 * running projector at the same index in projectOutputs. */
 	const QList<ProjectionEntry> &GetProjections() const { return projectionEntries; }
 
-	bool IsProjectionActive(int index) const;
-	void SetProjectionActive(int index, bool active);
+	/* True when this line is the one currently on its screen. A line can be
+	 * enabled yet covered by a layer in front of it. */
+	bool IsProjectionShown(int index) const;
+
+	void SetProjectionEnabled(int index, bool enabled);
+	void MoveProjectionEntry(int from, int to);
 
 	void AddProjectionEntry(const ProjectionEntry &entry);
 	void RemoveProjectionEntry(int index);
