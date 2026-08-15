@@ -191,8 +191,10 @@ void OBSBasicProjections::Refresh()
 		orderLayout->setContentsMargins(0, 0, 0, 0);
 		orderLayout->setSpacing(1);
 
-		QPushButton *upButton = new QPushButton(QString::fromUtf8("▲"));
-		QPushButton *downButton = new QPushButton(QString::fromUtf8("▼"));
+		/* Hollow triangles rather than solid ones: they read as controls to
+		 * press instead of a state indicator. */
+		QPushButton *upButton = new QPushButton(QString::fromUtf8("△"));
+		QPushButton *downButton = new QPushButton(QString::fromUtf8("▽"));
 
 		for (QPushButton *button : {upButton, downButton}) {
 			button->setFixedWidth(26);
