@@ -419,6 +419,17 @@ void OBSBasic::RefreshProjections()
 	emit projectionsChanged();
 }
 
+void OBSBasic::SetProjectionsRunning(bool running)
+{
+	if (projectionsRunning == running) {
+		return;
+	}
+
+	/* Routed through the button so the local UI and the remote page can
+	 * never disagree about the master state. */
+	ui->projectButton->setChecked(running);
+}
+
 void OBSBasic::SetProjectionEnabled(int index, bool enabled)
 {
 	if (index < 0 || index >= projectionEntries.size() || projectionEntries[index].enabled == enabled) {

@@ -1031,6 +1031,8 @@ public:
 	/* True when this line is the one currently on its screen. A line can be
 	 * enabled yet covered by a layer in front of it. */
 	bool IsProjectionShown(int index) const;
+	bool AreProjectionsRunning() const { return projectionsRunning; }
+	void SetProjectionsRunning(bool running);
 
 	void SetProjectionEnabled(int index, bool enabled);
 	void SetProjectionLocked(int index, bool locked);
