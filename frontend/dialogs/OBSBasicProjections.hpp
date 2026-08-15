@@ -20,9 +20,11 @@
 #include <QDialog>
 
 class OBSBasic;
+class QCheckBox;
 class QComboBox;
 class QLabel;
 class QPushButton;
+class QSpinBox;
 class QTableWidget;
 
 /* Lists what goes to which screen, one row per projection: a scene or the
@@ -37,6 +39,9 @@ class OBSBasicProjections : public QDialog {
 
 	QTableWidget *table = nullptr;
 	QComboBox *fadeCombo = nullptr;
+	QCheckBox *remoteCheck = nullptr;
+	QSpinBox *portSpin = nullptr;
+	QLabel *remoteLabel = nullptr;
 	QPushButton *removeButton = nullptr;
 	QLabel *warningLabel = nullptr;
 
@@ -52,6 +57,7 @@ class OBSBasicProjections : public QDialog {
 
 	void CommitRow(int row);
 	void UpdateWarning();
+	void UpdateRemoteLabel();
 
 protected:
 	bool eventFilter(QObject *watched, QEvent *event) override;
@@ -59,6 +65,7 @@ protected:
 private slots:
 	void OnAdd();
 	void OnRemove();
+	void OnRemoteToggled(bool on);
 
 public:
 	explicit OBSBasicProjections(OBSBasic *parent);

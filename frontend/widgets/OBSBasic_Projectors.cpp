@@ -22,6 +22,7 @@
 
 #include <OBSApp.hpp>
 #include <dialogs/OBSBasicProjections.hpp>
+#include <utility/ProjectionServer.hpp>
 #include <json11.hpp>
 #include <qt-wrappers.hpp>
 
@@ -628,4 +629,33 @@ void OBSBasic::SaveProjections()
 	}
 
 	config_set_string(App()->GetUserConfig(), "BasicWindow", "Projections", Json(array).dump().c_str());
+}
+
+/* ------------------------------------------------------------------------- */
+/* Remote control */
+
+bool OBSBasic::StartProjectionServer(quint16 port, const QString &key)
+{
+	if (!projectionServer) {
+		projectionServer = new ProjectionServer(this);
+	}
+
+	return projectionServer->Start(port, key);
+}
+
+void OBSBasic::StopProjectionServer()
+{
+	if (projectionServer) {
+		projectionServer->Stop();
+	}
+}
+
+bool OBSBasic::IsProjectionServerRunning() const
+{
+	return projectionServer && projectionServer->IsRunning();
+}
+
+QStringList OBSBasic::ProjectionServerAddresses() const
+{
+	return ProjectionServer::LocalAddresses();
 }

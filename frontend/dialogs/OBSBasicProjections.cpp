@@ -22,6 +22,7 @@
 #include <widgets/OBSBasic.hpp>
 
 #include <QCheckBox>
+#include <QSpinBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDropEvent>
@@ -42,6 +43,7 @@ OBSBasicProjections::OBSBasicProjections(OBSBasic *parent) : QDialog(parent), ma
 
 	BuildUI();
 	Refresh();
+	UpdateRemoteLabel();
 
 	/* The state also changes from the master button or from a projector
 	 * being dismissed, so the panel follows rather than owns it. */
@@ -106,6 +108,33 @@ void OBSBasicProjections::BuildUI()
 	fadeRow->addWidget(fadeCombo);
 	fadeRow->addStretch();
 
+	/* Remote control from a second machine in the control room. */
+	remoteCheck = new QCheckBox(QTStr("Basic.Projections.Remote"), this);
+	remoteCheck->setChecked(config_get_bool(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteEnabled"));
+
+	portSpin = new QSpinBox(this);
+	portSpin->setRange(1024, 65535);
+	portSpin->setValue((int)config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectionRemotePort"));
+
+	connect(remoteCheck, &QCheckBox::toggled, this, &OBSBasicProjections::OnRemoteToggled);
+	connect(portSpin, &QSpinBox::valueChanged, this, [this](int value) {
+		config_set_int(App()->GetUserConfig(), "BasicWindow", "ProjectionRemotePort", value);
+
+		/* Rebind straight away so the address on screen is never a lie. */
+		if (remoteCheck->isChecked()) {
+			OnRemoteToggled(true);
+		}
+	});
+
+	remoteLabel = new QLabel(this);
+	remoteLabel->setWordWrap(true);
+	remoteLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+
+	QHBoxLayout *remoteRow = new QHBoxLayout();
+	remoteRow->addWidget(remoteCheck);
+	remoteRow->addWidget(portSpin);
+	remoteRow->addStretch();
+
 	warningLabel = new QLabel(this);
 	warningLabel->setWordWrap(true);
 
@@ -116,6 +145,8 @@ void OBSBasicProjections::BuildUI()
 	layout->addWidget(table, 1);
 	layout->addLayout(rowButtons);
 	layout->addLayout(fadeRow);
+	layout->addLayout(remoteRow);
+	layout->addWidget(remoteLabel);
 	layout->addWidget(warningLabel);
 	layout->addWidget(buttons);
 	setLayout(layout);
@@ -322,6 +353,51 @@ bool OBSBasicProjections::eventFilter(QObject *watched, QEvent *event)
 	}
 
 	return QDialog::eventFilter(watched, event);
+}
+
+void OBSBasicProjections::OnRemoteToggled(bool on)
+{
+	config_set_bool(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteEnabled", on);
+
+	if (!on) {
+		main->StopProjectionServer();
+		UpdateRemoteLabel();
+		return;
+	}
+
+	const QString accessKey =
+		QString::fromUtf8(config_get_string(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteKey"));
+
+	if (!main->StartProjectionServer((quint16)portSpin->value(), accessKey)) {
+		QSignalBlocker block(remoteCheck);
+		remoteCheck->setChecked(false);
+		config_set_bool(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteEnabled", false);
+	}
+
+	UpdateRemoteLabel();
+}
+
+void OBSBasicProjections::UpdateRemoteLabel()
+{
+	if (!main->IsProjectionServerRunning()) {
+		remoteLabel->setText(QString());
+		return;
+	}
+
+	const QStringList addresses = main->ProjectionServerAddresses();
+
+	if (addresses.isEmpty()) {
+		remoteLabel->setText(QTStr("Basic.Projections.Remote.NoAddress"));
+		return;
+	}
+
+	QStringList urls;
+
+	for (const QString &address : addresses) {
+		urls.append(QString("http://%1:%2").arg(address, QString::number(portSpin->value())));
+	}
+
+	remoteLabel->setText(QTStr("Basic.Projections.Remote.Reachable").arg(urls.join("   ")));
 }
 
 void OBSBasicProjections::OnAdd()

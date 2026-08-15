@@ -53,6 +53,7 @@ class OBSBasicFilters;
 class OBSBasicInteraction;
 class OBSBasicLayouts;
 class OBSBasicProjections;
+class ProjectionServer;
 class SceneDock;
 class OBSBasicProperties;
 class OBSBasicSourceSelect;
@@ -991,6 +992,7 @@ private:
 	bool projectionsRunning = false;
 
 	QPointer<OBSBasicProjections> projectionsDialog;
+	QPointer<ProjectionServer> projectionServer;
 	QPointer<QMenu> previewProjector;
 	QPointer<QMenu> previewProjectorSource;
 	QPointer<QMenu> previewProjectorMain;
@@ -1040,6 +1042,13 @@ public:
 
 	void LoadProjections();
 	void SaveProjections();
+
+	/* Remote control of the projection lines from another machine on the
+	 * local network. */
+	bool StartProjectionServer(quint16 port, const QString &key);
+	void StopProjectionServer();
+	bool IsProjectionServerRunning() const;
+	QStringList ProjectionServerAddresses() const;
 
 signals:
 	void projectionsChanged();

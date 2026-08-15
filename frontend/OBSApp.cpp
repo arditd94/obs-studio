@@ -361,6 +361,10 @@ void OBSApp::InitUserConfigDefaults()
 	config_set_default_bool(userConfig, "BasicWindow", "ScreenSnapping", true);
 	config_set_default_bool(userConfig, "BasicWindow", "SourceSnapping", true);
 	config_set_default_bool(userConfig, "BasicWindow", "CenterSnapping", false);
+
+	config_set_default_bool(userConfig, "BasicWindow", "ProjectionRemoteEnabled", false);
+	config_set_default_uint(userConfig, "BasicWindow", "ProjectionRemotePort", 4460);
+	config_set_default_string(userConfig, "BasicWindow", "ProjectionRemoteKey", "1408");
 	config_set_default_double(userConfig, "BasicWindow", "SnapDistance", 10.0);
 	config_set_default_bool(userConfig, "BasicWindow", "SpacingHelpersEnabled", true);
 	config_set_default_bool(userConfig, "BasicWindow", "RecordWhenStreaming", false);

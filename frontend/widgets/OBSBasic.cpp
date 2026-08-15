@@ -1246,6 +1246,13 @@ void OBSBasic::OBSInit()
 	LoadSceneDocks();
 	LoadProjections();
 
+	if (config_get_bool(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteEnabled")) {
+		StartProjectionServer(
+			(quint16)config_get_uint(App()->GetUserConfig(), "BasicWindow", "ProjectionRemotePort"),
+			QString::fromUtf8(
+				config_get_string(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteKey")));
+	}
+
 #ifdef YOUTUBE_ENABLED
 	/* setup YouTube app dock */
 	if (YouTubeAppDock::IsYTServiceSelected()) {
