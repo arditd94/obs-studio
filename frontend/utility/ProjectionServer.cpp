@@ -97,6 +97,22 @@ QStringList ProjectionServer::LocalAddresses()
 	return out;
 }
 
+/* Windows hands back IPv4 peers as IPv4-mapped IPv6 addresses, which match no
+ * IPv4 subnet, so the address is folded back to IPv4 before it is tested. */
+static bool IsPrivateAddress(const QHostAddress &address)
+{
+	QHostAddress peer = address;
+	bool converted = false;
+	const quint32 asIPv4 = peer.toIPv4Address(&converted);
+
+	if (converted) {
+		peer = QHostAddress(asIPv4);
+	}
+
+	return peer.isLoopback() || peer.isInSubnet(QHostAddress("10.0.0.0"), 8) ||
+	       peer.isInSubnet(QHostAddress("172.16.0.0"), 12) || peer.isInSubnet(QHostAddress("192.168.0.0"), 16);
+}
+
 void ProjectionServer::OnNewConnection()
 {
 	while (server && server->hasPendingConnections()) {
@@ -104,14 +120,9 @@ void ProjectionServer::OnNewConnection()
 
 		/* Only the local network is ever meant to reach this, so anything
 		 * routed in from outside is dropped before it is even read. */
-		const QHostAddress peer = socket->peerAddress();
-		const bool isPrivate = peer.isLoopback() || peer.isInSubnet(QHostAddress("10.0.0.0"), 8) ||
-				       peer.isInSubnet(QHostAddress("172.16.0.0"), 12) ||
-				       peer.isInSubnet(QHostAddress("192.168.0.0"), 16);
-
-		if (!isPrivate) {
+		if (!IsPrivateAddress(socket->peerAddress())) {
 			blog(LOG_WARNING, "Projection server refused a connection from %s",
-			     QT_TO_UTF8(peer.toString()));
+			     QT_TO_UTF8(socket->peerAddress().toString()));
 			socket->abort();
 			socket->deleteLater();
 			continue;
