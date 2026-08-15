@@ -313,6 +313,7 @@ void OBSBasic::on_projectButton_toggled(bool checked)
 
 		projector->StartFade(true, fadeMs);
 		projectOutput = projector;
+		SetProjectButtonActive(true);
 		return;
 	}
 
@@ -322,6 +323,7 @@ void OBSBasic::on_projectButton_toggled(bool checked)
 
 	OBSProjector *projector = projectOutput;
 	projectOutput = nullptr;
+	SetProjectButtonActive(false);
 
 	if (fadeMs == 0) {
 		DeleteProjector(projector);
@@ -340,6 +342,14 @@ void OBSBasic::on_projectButton_toggled(bool checked)
 			}
 		}
 	});
+}
+
+void OBSBasic::SetProjectButtonActive(bool active)
+{
+	/* Green while a screen is being fed, so the state is readable across the
+	 * room rather than only from the pressed look of the button. */
+	ui->projectButton->setStyleSheet(active ? "QPushButton { background-color: rgb(38, 138, 60); color: rgb(255, 255, 255); }"
+						: "");
 }
 
 void OBSBasic::on_projectSettingsButton_clicked()

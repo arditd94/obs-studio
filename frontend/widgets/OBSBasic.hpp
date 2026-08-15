@@ -987,6 +987,8 @@ private slots:
 	void OpenSceneWindow();
 	void openMultiviewWindow();
 
+	void SetProjectButtonActive(bool active);
+
 private slots:
 	/* Auto-connected by name, so these have to be declared as slots. */
 	void on_projectButton_toggled(bool checked);
