@@ -424,9 +424,26 @@ void OBSBasic::SetProjectionEnabled(int index, bool enabled)
 		return;
 	}
 
+	/* Locked lines can be raised but not dropped. */
+	if (!enabled && projectionEntries[index].locked) {
+		return;
+	}
+
 	projectionEntries[index].enabled = enabled;
 	SaveProjections();
 	RefreshProjections();
+}
+
+void OBSBasic::SetProjectionLocked(int index, bool locked)
+{
+	if (index < 0 || index >= projectionEntries.size()) {
+		return;
+	}
+
+	projectionEntries[index].locked = locked;
+	SaveProjections();
+
+	emit projectionsChanged();
 }
 
 void OBSBasic::MoveProjectionEntry(int from, int to)
@@ -455,7 +472,7 @@ void OBSBasic::AddProjectionEntry(const ProjectionEntry &entry)
 
 void OBSBasic::RemoveProjectionEntry(int index)
 {
-	if (index < 0 || index >= projectionEntries.size()) {
+	if (index < 0 || index >= projectionEntries.size() || projectionEntries[index].locked) {
 		return;
 	}
 
@@ -472,9 +489,11 @@ void OBSBasic::SetProjectionEntry(int index, const ProjectionEntry &entry)
 	}
 
 	const bool enabled = projectionEntries[index].enabled;
+	const bool locked = projectionEntries[index].locked;
 
 	projectionEntries[index] = entry;
 	projectionEntries[index].enabled = enabled;
+	projectionEntries[index].locked = locked;
 
 	SaveProjections();
 	RefreshProjections();
@@ -589,6 +608,7 @@ void OBSBasic::LoadProjections()
 		entry.sceneUuid = QString::fromStdString(item["scene"].string_value());
 		entry.monitor = item["monitor"].int_value();
 		entry.enabled = item["enabled"].bool_value();
+		entry.locked = item["locked"].bool_value();
 
 		projectionEntries.append(entry);
 	}
@@ -603,6 +623,7 @@ void OBSBasic::SaveProjections()
 			{"scene", QT_TO_UTF8(entry.sceneUuid)},
 			{"monitor", entry.monitor},
 			{"enabled", entry.enabled},
+			{"locked", entry.locked},
 		});
 	}
 

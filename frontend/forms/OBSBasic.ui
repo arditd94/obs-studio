@@ -697,9 +697,8 @@
             <property name="toolTip">
              <string>Basic.Project.Settings</string>
             </property>
-            <property name="icon">
-             <iconset resource="obs.qrc">
-              <normaloff>:/settings/images/settings/general.svg</normaloff>:/settings/images/settings/general.svg</iconset>
+            <property name="text">
+             <string notr="true">⚙</string>
             </property>
            </widget>
           </item>

@@ -107,6 +107,10 @@ struct ProjectionEntry {
 	QString sceneUuid;
 	int monitor = 0;
 	bool enabled = false;
+
+	/* A locked line cannot be switched off or removed from the panel, so a
+	 * stray click cannot drop it off air. */
+	bool locked = false;
 };
 
 struct SavedProjectorInfo {
@@ -1027,6 +1031,7 @@ public:
 	bool IsProjectionShown(int index) const;
 
 	void SetProjectionEnabled(int index, bool enabled);
+	void SetProjectionLocked(int index, bool locked);
 	void MoveProjectionEntry(int from, int to);
 
 	void AddProjectionEntry(const ProjectionEntry &entry);
