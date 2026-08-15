@@ -26,6 +26,8 @@
 #include <vector>
 
 class OBSQTDisplay;
+class QTimer;
+class QWidget;
 
 /* A dock showing the live preview of one scene. Clicking the preview takes the
  * scene to air, which turns a row of these into a switcher.
@@ -38,8 +40,20 @@ class SceneDock : public OBSDock {
 	OBSWeakSource weakScene;
 
 	QPointer<OBSQTDisplay> preview;
+	QPointer<QWidget> content;
+	QPointer<QTimer> liveTimer;
+
+	/* Cached so the stylesheet is only rewritten when the state actually
+	 * flips rather than on every poll. */
+	bool live = false;
 
 	std::vector<OBSSignal> sigs;
+
+	/* True when this scene is what the program output is showing, taking
+	 * studio mode into account. */
+	bool IsLive() const;
+
+	void RefreshLiveState();
 
 	static void DrawPreview(void *data, uint32_t cx, uint32_t cy);
 	static void SceneRenamed(void *param, calldata_t *data);

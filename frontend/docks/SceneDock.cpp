@@ -24,6 +24,7 @@
 #include <widgets/OBSQTDisplay.hpp>
 
 #include <QMouseEvent>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -52,12 +53,25 @@ SceneDock::SceneDock(OBSSource scene, QWidget *parent) : OBSDock(parent)
 	preview->installEventFilter(this);
 
 	QVBoxLayout *layout = new QVBoxLayout();
-	layout->setContentsMargins(2, 2, 2, 2);
+	/* The margin is what the live border is drawn into, so it has to be at
+	 * least as thick as the border itself. */
+	layout->setContentsMargins(3, 3, 3, 3);
 	layout->addWidget(preview, 1);
 
-	QWidget *content = new QWidget(this);
+	content = new QWidget(this);
+	content->setObjectName("sceneDockContent");
 	content->setLayout(layout);
 	setWidget(content);
+
+	RefreshLiveState();
+
+	/* Polled rather than wired to a scene-change signal: the program scene
+	 * can move for reasons the dock cannot see, such as a transition
+	 * finishing or studio mode being toggled. */
+	liveTimer = new QTimer(this);
+	liveTimer->setInterval(250);
+	connect(liveTimer.data(), &QTimer::timeout, this, &SceneDock::RefreshLiveState);
+	liveTimer->start();
 
 	signal_handler_t *handler = obs_source_get_signal_handler(scene);
 	sigs.emplace_back(handler, "rename", SceneDock::SceneRenamed, this);
@@ -75,6 +89,45 @@ SceneDock::~SceneDock()
 OBSSource SceneDock::GetScene() const
 {
 	return OBSGetStrongRef(weakScene);
+}
+
+bool SceneDock::IsLive() const
+{
+	OBSSource scene = GetScene();
+
+	if (!scene) {
+		return false;
+	}
+
+	OBSBasic *main = OBSBasic::Get();
+
+	if (!main) {
+		return false;
+	}
+
+	/* In studio mode the program output follows its own scene; otherwise
+	 * the selected scene is what goes out. */
+	OBSSource program = main->IsPreviewProgramMode() ? main->GetProgramSource() : main->GetCurrentSceneSource();
+
+	return program == scene;
+}
+
+void SceneDock::RefreshLiveState()
+{
+	const bool nowLive = IsLive();
+
+	if (nowLive == live) {
+		return;
+	}
+
+	live = nowLive;
+
+	if (!content) {
+		return;
+	}
+
+	content->setStyleSheet(live ? "QWidget#sceneDockContent { border: 3px solid rgb(255, 0, 0); }"
+				    : "QWidget#sceneDockContent { border: 3px solid transparent; }");
 }
 
 void SceneDock::DrawPreview(void *data, uint32_t cx, uint32_t cy)
