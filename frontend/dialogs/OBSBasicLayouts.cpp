@@ -26,6 +26,7 @@
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFileDialog>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -161,9 +162,44 @@ void OBSBasicLayouts::BuildUI()
 	addSlotButton = new QPushButton(QTStr("Basic.Layouts.AddSlot"), this);
 	removeSlotButton = new QPushButton(QTStr("Basic.Layouts.RemoveSlot"), this);
 
+	QGridLayout *alignGrid = new QGridLayout();
+	alignGrid->setSpacing(3);
+
+	/* Arrows keep the grid compact; the translated wording lives in the
+	 * tooltip and the accessible name. */
+	auto addAlignButton = [&](const char *glyph, const char *lookup, LayoutView::AlignAction action, int row,
+				  int column) {
+		QPushButton *button = new QPushButton(QString::fromUtf8(glyph), this);
+
+		button->setToolTip(QTStr(lookup));
+		button->setAccessibleName(QTStr(lookup));
+		button->setMaximumWidth(44);
+
+		connect(button, &QPushButton::clicked, this, [this, action]() { editor->AlignSelectedSlot(action); });
+
+		alignGrid->addWidget(button, row, column);
+		alignButtons.push_back(button);
+	};
+
+	addAlignButton("\xE2\x97\x80", "Basic.Layouts.Align.Left", LayoutView::AlignAction::Left, 0, 0);
+	addAlignButton("\xE2\x86\x94", "Basic.Layouts.Align.HCenter", LayoutView::AlignAction::HCenter, 0, 1);
+	addAlignButton("\xE2\x96\xB6", "Basic.Layouts.Align.Right", LayoutView::AlignAction::Right, 0, 2);
+	addAlignButton("\xE2\x96\xB2", "Basic.Layouts.Align.Top", LayoutView::AlignAction::Top, 1, 0);
+	addAlignButton("\xE2\x86\x95", "Basic.Layouts.Align.VCenter", LayoutView::AlignAction::VCenter, 1, 1);
+	addAlignButton("\xE2\x96\xBC", "Basic.Layouts.Align.Bottom", LayoutView::AlignAction::Bottom, 1, 2);
+
+	QPushButton *fillButton = new QPushButton(QTStr("Basic.Layouts.Align.Fill"), this);
+	connect(fillButton, &QPushButton::clicked, this,
+		[this]() { editor->AlignSelectedSlot(LayoutView::AlignAction::FillCanvas); });
+	alignButtons.push_back(fillButton);
+
 	QVBoxLayout *editorSide = new QVBoxLayout();
 	editorSide->addWidget(addSlotButton);
 	editorSide->addWidget(removeSlotButton);
+	editorSide->addSpacing(10);
+	editorSide->addWidget(new QLabel(QTStr("Basic.Layouts.Align"), this));
+	editorSide->addLayout(alignGrid);
+	editorSide->addWidget(fillButton);
 	editorSide->addStretch();
 
 	QHBoxLayout *editorLayout = new QHBoxLayout();
@@ -349,6 +385,13 @@ void OBSBasicLayouts::UpdateButtonStates()
 	deleteButton->setEnabled(editable);
 	addSlotButton->setEnabled(editable && current.slotList.size() < kMaxLayoutSlots);
 	removeSlotButton->setEnabled(editable && current.slotList.size() > 1);
+
+	/* Alignment acts on the selected slot, so it needs both an editable
+	 * layout and an actual selection. */
+	const bool canAlign = editable && editor->SelectedSlot() >= 0;
+
+	for (QPushButton *button : alignButtons)
+		button->setEnabled(canAlign);
 	applyButton->setEnabled(hasLayout && hasScene);
 
 	if (!hasScene)

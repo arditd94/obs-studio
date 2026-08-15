@@ -17,11 +17,14 @@
 
 #include "LayoutView.hpp"
 
+#include <OBSApp.hpp>
+
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 
 #include <algorithm>
+#include <vector>
 
 /* Thickness of the grab band along a slot edge, in device independent pixels. */
 constexpr qreal kHandleSize = 7.0;
@@ -187,6 +190,210 @@ void LayoutView::UpdateCursor(const QPointF &pos)
 	}
 }
 
+void LayoutView::ApplySnapping(LayoutSlot &slot, DragMode drag, bool disabled)
+{
+	snappedX = false;
+	snappedY = false;
+
+	config_t *config = App()->GetUserConfig();
+
+	/* The editor deliberately reuses the preview's snapping preferences so
+	 * both surfaces behave the same way for the same user. */
+	if (disabled || !config_get_bool(config, "BasicWindow", "SnappingEnabled"))
+		return;
+
+	const QRectF canvas = CanvasRect();
+	if (canvas.isEmpty())
+		return;
+
+	const double distance = config_get_double(config, "BasicWindow", "SnapDistance");
+	const float thresholdX = (float)(distance / canvas.width());
+	const float thresholdY = (float)(distance / canvas.height());
+
+	std::vector<float> targetsX;
+	std::vector<float> targetsY;
+
+	if (config_get_bool(config, "BasicWindow", "ScreenSnapping")) {
+		targetsX.push_back(0.0f);
+		targetsX.push_back(1.0f);
+		targetsY.push_back(0.0f);
+		targetsY.push_back(1.0f);
+	}
+
+	if (config_get_bool(config, "BasicWindow", "CenterSnapping")) {
+		targetsX.push_back(0.5f);
+		targetsY.push_back(0.5f);
+	}
+
+	if (config_get_bool(config, "BasicWindow", "SourceSnapping")) {
+		for (size_t i = 0; i < layout.slotList.size(); i++) {
+			if ((int)i == selectedSlot)
+				continue;
+
+			const LayoutSlot &other = layout.slotList[i];
+
+			targetsX.push_back(other.x);
+			targetsX.push_back(other.x + other.cx / 2.0f);
+			targetsX.push_back(other.x + other.cx);
+			targetsY.push_back(other.y);
+			targetsY.push_back(other.y + other.cy / 2.0f);
+			targetsY.push_back(other.y + other.cy);
+		}
+	}
+
+	if (targetsX.empty() && targetsY.empty())
+		return;
+
+	/* Only the edges the drag actually moves may snap; resizing the right
+	 * edge must not drag the left one along. */
+	bool snapLeft = false;
+	bool snapRight = false;
+	bool snapTop = false;
+	bool snapBottom = false;
+	bool moving = false;
+
+	switch (drag) {
+	case DragMode::Move:
+		moving = true;
+		break;
+	case DragMode::ResizeLeft:
+		snapLeft = true;
+		break;
+	case DragMode::ResizeRight:
+		snapRight = true;
+		break;
+	case DragMode::ResizeTop:
+		snapTop = true;
+		break;
+	case DragMode::ResizeBottom:
+		snapBottom = true;
+		break;
+	case DragMode::ResizeTopLeft:
+		snapLeft = snapTop = true;
+		break;
+	case DragMode::ResizeTopRight:
+		snapRight = snapTop = true;
+		break;
+	case DragMode::ResizeBottomLeft:
+		snapLeft = snapBottom = true;
+		break;
+	case DragMode::ResizeBottomRight:
+		snapRight = snapBottom = true;
+		break;
+	case DragMode::None:
+		return;
+	}
+
+	auto snapAxis = [](const std::vector<float> &edges, const std::vector<float> &targets, float threshold,
+			   float &delta, float &line) {
+		float bestAbs = threshold;
+		bool found = false;
+
+		for (float edge : edges) {
+			for (float target : targets) {
+				const float diff = target - edge;
+				const float absDiff = std::fabs(diff);
+
+				if (absDiff <= bestAbs) {
+					bestAbs = absDiff;
+					delta = diff;
+					line = target;
+					found = true;
+				}
+			}
+		}
+
+		return found;
+	};
+
+	std::vector<float> edgesX;
+	std::vector<float> edgesY;
+
+	if (moving) {
+		edgesX = {slot.x, slot.x + slot.cx / 2.0f, slot.x + slot.cx};
+		edgesY = {slot.y, slot.y + slot.cy / 2.0f, slot.y + slot.cy};
+	} else {
+		if (snapLeft)
+			edgesX.push_back(slot.x);
+		if (snapRight)
+			edgesX.push_back(slot.x + slot.cx);
+		if (snapTop)
+			edgesY.push_back(slot.y);
+		if (snapBottom)
+			edgesY.push_back(slot.y + slot.cy);
+	}
+
+	float delta = 0.0f;
+
+	if (!edgesX.empty() && snapAxis(edgesX, targetsX, thresholdX, delta, snapLineX)) {
+		if (moving) {
+			slot.x += delta;
+		} else if (snapLeft) {
+			slot.x += delta;
+			slot.cx -= delta;
+		} else {
+			slot.cx += delta;
+		}
+
+		snappedX = true;
+	}
+
+	delta = 0.0f;
+
+	if (!edgesY.empty() && snapAxis(edgesY, targetsY, thresholdY, delta, snapLineY)) {
+		if (moving) {
+			slot.y += delta;
+		} else if (snapTop) {
+			slot.y += delta;
+			slot.cy -= delta;
+		} else {
+			slot.cy += delta;
+		}
+
+		snappedY = true;
+	}
+}
+
+void LayoutView::AlignSelectedSlot(AlignAction action)
+{
+	if (mode != Mode::Editor || selectedSlot < 0 || selectedSlot >= (int)layout.slotList.size())
+		return;
+
+	LayoutSlot &slot = layout.slotList[selectedSlot];
+
+	switch (action) {
+	case AlignAction::Left:
+		slot.x = 0.0f;
+		break;
+	case AlignAction::HCenter:
+		slot.x = (1.0f - slot.cx) / 2.0f;
+		break;
+	case AlignAction::Right:
+		slot.x = 1.0f - slot.cx;
+		break;
+	case AlignAction::Top:
+		slot.y = 0.0f;
+		break;
+	case AlignAction::VCenter:
+		slot.y = (1.0f - slot.cy) / 2.0f;
+		break;
+	case AlignAction::Bottom:
+		slot.y = 1.0f - slot.cy;
+		break;
+	case AlignAction::FillCanvas:
+		slot.x = 0.0f;
+		slot.y = 0.0f;
+		slot.cx = 1.0f;
+		slot.cy = 1.0f;
+		break;
+	}
+
+	slot.Normalize();
+	update();
+
+	emit LayoutChanged();
+}
+
 void LayoutView::paintEvent(QPaintEvent *)
 {
 	QPainter painter(this);
@@ -227,6 +434,23 @@ void LayoutView::paintEvent(QPaintEvent *)
 		painter.setFont(font);
 		painter.setPen(pal.color(QPalette::HighlightedText));
 		painter.drawText(r, Qt::AlignCenter, QString::number(i + 1));
+	}
+
+	/* Snap guides, shown only while a drag is actually snapped so they read
+	 * as feedback rather than decoration. */
+	if (dragMode != DragMode::None && (snappedX || snappedY)) {
+		painter.setPen(QPen(QColor(255, 96, 96), 1.0, Qt::DashLine));
+		painter.setBrush(Qt::NoBrush);
+
+		if (snappedX) {
+			const qreal x = canvas.left() + snapLineX * canvas.width();
+			painter.drawLine(QPointF(x, canvas.top()), QPointF(x, canvas.bottom()));
+		}
+
+		if (snappedY) {
+			const qreal y = canvas.top() + snapLineY * canvas.height();
+			painter.drawLine(QPointF(canvas.left(), y), QPointF(canvas.right(), y));
+		}
 	}
 
 	/* Outline: selection state in the preset grid, plain border elsewhere. */
@@ -352,6 +576,9 @@ void LayoutView::mouseMoveEvent(QMouseEvent *event)
 		return;
 	}
 
+	/* Ctrl suppresses snapping for one drag, matching the preview. */
+	ApplySnapping(slot, dragMode, event->modifiers() & Qt::ControlModifier);
+
 	slot.Normalize();
 
 	if (!(slot == layout.slotList[selectedSlot])) {
@@ -365,6 +592,9 @@ void LayoutView::mouseReleaseEvent(QMouseEvent *event)
 {
 	if (mode == Mode::Editor && dragMode != DragMode::None) {
 		dragMode = DragMode::None;
+		snappedX = false;
+		snappedY = false;
+		update();
 		UpdateCursor(event->position());
 	}
 

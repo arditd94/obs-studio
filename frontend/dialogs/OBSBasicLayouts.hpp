@@ -61,6 +61,10 @@ class OBSBasicLayouts : public QDialog {
 	QPushButton *addSlotButton = nullptr;
 	QPushButton *removeSlotButton = nullptr;
 
+	/* Alignment commands, enabled together whenever an editable slot is
+	 * selected. */
+	std::vector<QPushButton *> alignButtons;
+
 	/* Working copy of the selected layout. Edits are written back to the
 	 * manager only for user layouts. */
 	SceneLayout current;

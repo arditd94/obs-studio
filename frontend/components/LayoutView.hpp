@@ -62,6 +62,17 @@ private:
 	QPointF dragOrigin;
 	LayoutSlot dragStartSlot;
 
+	/* Set while a drag is snapped, so the guide can be drawn. Coordinates
+	 * are normalized like the slots themselves. */
+	bool snappedX = false;
+	bool snappedY = false;
+	float snapLineX = 0.0f;
+	float snapLineY = 0.0f;
+
+	/* Nudges the slot onto nearby canvas or sibling edges. Honours the
+	 * snapping preferences the user already set for the preview. */
+	void ApplySnapping(LayoutSlot &slot, DragMode drag, bool disabled);
+
 	/* Rectangle inside the widget the canvas is drawn into. */
 	QRectF CanvasRect() const;
 
@@ -92,6 +103,20 @@ public:
 
 	int SelectedSlot() const { return selectedSlot; }
 	void SetSelectedSlot(int index);
+
+	enum class AlignAction {
+		Left,
+		HCenter,
+		Right,
+		Top,
+		VCenter,
+		Bottom,
+		FillCanvas,
+	};
+
+	/* Moves the selected slot against a canvas edge, its centre, or expands
+	 * it to the whole canvas. No-op when nothing is selected. */
+	void AlignSelectedSlot(AlignAction action);
 
 	QSize sizeHint() const override;
 
