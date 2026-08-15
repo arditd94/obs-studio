@@ -217,7 +217,7 @@ void OBSBasicProjections::Refresh()
 		/* A line can be enabled yet hidden behind a layer in front of
 		 * it, so the tooltip says which of the two it is. */
 		check->setToolTip(main->IsProjectionShown(row) ? QTStr("Basic.Projections.OnAir")
-							      : QTStr("Basic.Projections.Covered"));
+							       : QTStr("Basic.Projections.Covered"));
 
 		/* A locked line can still be raised, so the box only refuses to
 		 * be cleared. */
@@ -239,8 +239,7 @@ void OBSBasicProjections::Refresh()
 
 		table->setCellWidget(row, 3, holder);
 
-		QPushButton *lockButton = new QPushButton(
-			QString::fromUtf8(entries[row].locked ? "🔒" : "🔓"));
+		QPushButton *lockButton = new QPushButton(QString::fromUtf8(entries[row].locked ? "🔒" : "🔓"));
 		lockButton->setCheckable(true);
 		lockButton->setChecked(entries[row].locked);
 		lockButton->setFlat(true);
@@ -260,7 +259,6 @@ void OBSBasicProjections::Refresh()
 		lockLayout->addWidget(lockButton);
 
 		table->setCellWidget(row, 4, lockHolder);
-
 	}
 
 	removeButton->setEnabled(table->rowCount() > 0);

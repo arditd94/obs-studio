@@ -1045,7 +1045,6 @@ signals:
 	void projectionsChanged();
 
 private:
-
 private slots:
 	/* Auto-connected by name, so these have to be declared as slots. */
 	void on_projectButton_toggled(bool checked);

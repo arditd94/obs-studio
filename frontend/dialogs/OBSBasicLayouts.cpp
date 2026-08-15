@@ -51,8 +51,9 @@ std::vector<SceneItemEntry> CollectSceneItems(obs_scene_t *scene)
 {
 	std::vector<SceneItemEntry> entries;
 
-	if (!scene)
+	if (!scene) {
 		return entries;
+	}
 
 	auto enumItem = [](obs_scene_t *, obs_sceneitem_t *item, void *param) {
 		auto *list = static_cast<std::vector<SceneItemEntry> *>(param);
@@ -91,10 +92,11 @@ OBSBasicLayouts::OBSBasicLayouts(OBSBasic *parent) : QDialog(parent), main(paren
 	RebuildPresets();
 
 	const auto &layouts = SceneLayoutManager::Instance().Layouts();
-	if (!layouts.empty())
+	if (!layouts.empty()) {
 		SelectLayout(layouts.front().id);
-	else
+	} else {
 		UpdateButtonStates();
+	}
 }
 
 void OBSBasicLayouts::BuildUI()
@@ -255,8 +257,9 @@ void OBSBasicLayouts::BuildUI()
 	uint32_t cx = 0;
 	uint32_t cy = 0;
 
-	if (GetSceneCanvasSize(CurrentScene(), cx, cy) && cy > 0)
+	if (GetSceneCanvasSize(CurrentScene(), cx, cy) && cy > 0) {
 		editor->SetAspect((double)cx / (double)cy);
+	}
 }
 
 OBSScene OBSBasicLayouts::CurrentScene()
@@ -277,8 +280,9 @@ void OBSBasicLayouts::RebuildPresets()
 	uint32_t cx = 0;
 	uint32_t cy = 0;
 
-	if (GetSceneCanvasSize(CurrentScene(), cx, cy) && cy > 0)
+	if (GetSceneCanvasSize(CurrentScene(), cx, cy) && cy > 0) {
 		aspect = (double)cx / (double)cy;
+	}
 
 	for (const SceneLayout &layout : SceneLayoutManager::Instance().Layouts()) {
 		LayoutView *view = new LayoutView(presetContainer, LayoutView::Mode::Preview);
@@ -300,16 +304,18 @@ void OBSBasicLayouts::RebuildPresets()
 void OBSBasicLayouts::SelectLayout(const std::string &id)
 {
 	const SceneLayout *layout = SceneLayoutManager::Instance().Find(id);
-	if (!layout)
+	if (!layout) {
 		return;
+	}
 
 	current = *layout;
 
 	editor->SetLayout(current);
 	editor->SetSelectedSlot(current.slotList.empty() ? -1 : 0);
 
-	for (LayoutView *view : presetViews)
+	for (LayoutView *view : presetViews) {
 		view->SetSelected(view->property("layoutId").toString().toStdString() == id);
+	}
 
 	RebuildSlotRows();
 	UpdateButtonStates();
@@ -322,12 +328,14 @@ void OBSBasicLayouts::RebuildSlotRows()
 	std::vector<int64_t> previous;
 	previous.reserve(slotCombos.size());
 
-	for (QComboBox *combo : slotCombos)
+	for (QComboBox *combo : slotCombos) {
 		previous.push_back(combo->currentData().toLongLong());
+	}
 
 	while (QLayoutItem *item = slotBox->takeAt(0)) {
-		if (QWidget *widget = item->widget())
+		if (QWidget *widget = item->widget()) {
 			widget->deleteLater();
+		}
 
 		delete item;
 	}
@@ -350,8 +358,9 @@ void OBSBasicLayouts::RebuildSlotRows()
 		if (i < previous.size()) {
 			const int index = combo->findData(QVariant::fromValue(previous[i]));
 
-			if (index >= 0)
+			if (index >= 0) {
 				combo->setCurrentIndex(index);
+			}
 		}
 
 		connect(combo, &QComboBox::currentTextChanged, this, [this]() { UpdateSlotLabels(); });
@@ -385,13 +394,15 @@ void OBSBasicLayouts::PopulateSourceCombo(QComboBox *combo, int slotIndex)
 
 	const std::vector<SceneItemEntry> entries = CollectSceneItems(CurrentScene());
 
-	for (const SceneItemEntry &entry : entries)
+	for (const SceneItemEntry &entry : entries) {
 		combo->addItem(QString::fromStdString(entry.name), QVariant::fromValue(entry.id));
+	}
 
 	/* Pre-assign the scene's own items in order, so opening the dialog on a
 	 * scene that already holds the cameras needs no manual pairing. */
-	if (slotIndex >= 0 && slotIndex < (int)entries.size())
+	if (slotIndex >= 0 && slotIndex < (int)entries.size()) {
 		combo->setCurrentIndex(slotIndex + 1);
+	}
 }
 
 void OBSBasicLayouts::UpdateButtonStates()
@@ -411,41 +422,46 @@ void OBSBasicLayouts::UpdateButtonStates()
 	 * layout and an actual selection. */
 	const bool canAlign = editable && editor->SelectedSlot() >= 0;
 
-	for (QPushButton *button : alignButtons)
+	for (QPushButton *button : alignButtons) {
 		button->setEnabled(canAlign);
+	}
 	applyButton->setEnabled(hasLayout && hasScene);
 
 	/* Inverting acts on the assignments, not the layout, so it stays
 	 * available on read-only built-in layouts too. */
 	invertButton->setEnabled(slotCombos.size() >= 2);
 
-	if (!hasScene)
+	if (!hasScene) {
 		statusLabel->setText(QTStr("Basic.Layouts.NoScene"));
-	else if (hasLayout && current.builtin)
+	} else if (hasLayout && current.builtin) {
 		statusLabel->setText(QTStr("Basic.Layouts.BuiltinReadOnly"));
-	else
+	} else {
 		statusLabel->setText(QTStr("Basic.Layouts.EditorHint"));
+	}
 }
 
 void OBSBasicLayouts::CommitCurrentLayout()
 {
-	if (current.builtin || current.id.empty())
+	if (current.builtin || current.id.empty()) {
 		return;
+	}
 
 	SceneLayoutManager::Instance().AddOrReplace(current);
 	SceneLayoutManager::Instance().Save();
 
 	for (LayoutView *view : presetViews) {
-		if (view->property("layoutId").toString().toStdString() == current.id)
+		if (view->property("layoutId").toString().toStdString() == current.id) {
 			view->SetLayout(current);
+		}
 	}
 }
 
 void OBSBasicLayouts::OnPresetClicked()
 {
 	LayoutView *view = qobject_cast<LayoutView *>(sender());
-	if (!view)
+	if (!view) {
 		return;
+	}
 
 	SelectLayout(view->property("layoutId").toString().toStdString());
 }
@@ -477,8 +493,9 @@ void OBSBasicLayouts::OnInvert()
 	 * this is simply a swap. */
 	const size_t count = slotCombos.size();
 
-	if (count < 2)
+	if (count < 2) {
 		return;
+	}
 
 	for (size_t i = 0; i < count / 2; i++) {
 		const int first = slotCombos[i]->currentIndex();
@@ -495,20 +512,23 @@ void OBSBasicLayouts::OnAdd()
 {
 	std::string name;
 
-	if (!NameDialog::AskForName(this, QTStr("Basic.Layouts.NewLayout.Title"),
-				    QTStr("Basic.Layouts.NewLayout.Text"), name))
+	if (!NameDialog::AskForName(this, QTStr("Basic.Layouts.NewLayout.Title"), QTStr("Basic.Layouts.NewLayout.Text"),
+				    name)) {
 		return;
+	}
 
-	if (name.empty())
+	if (name.empty()) {
 		return;
+	}
 
 	SceneLayout layout;
 	layout.id = SceneLayoutManager::Instance().GenerateId(name);
 	layout.name = name;
 	layout.slotList = {{0.0f, 0.25f, 0.5f, 0.5f}, {0.5f, 0.25f, 0.5f, 0.5f}};
 
-	if (!SceneLayoutManager::Instance().AddOrReplace(layout))
+	if (!SceneLayoutManager::Instance().AddOrReplace(layout)) {
 		return;
+	}
 
 	SceneLayoutManager::Instance().Save();
 
@@ -519,25 +539,29 @@ void OBSBasicLayouts::OnAdd()
 
 void OBSBasicLayouts::OnDuplicate()
 {
-	if (current.id.empty())
+	if (current.id.empty()) {
 		return;
+	}
 
 	std::string name = current.name + " (2)";
 
-	if (!NameDialog::AskForName(this, QTStr("Basic.Layouts.NewLayout.Title"),
-				    QTStr("Basic.Layouts.NewLayout.Text"), name))
+	if (!NameDialog::AskForName(this, QTStr("Basic.Layouts.NewLayout.Title"), QTStr("Basic.Layouts.NewLayout.Text"),
+				    name)) {
 		return;
+	}
 
-	if (name.empty())
+	if (name.empty()) {
 		return;
+	}
 
 	SceneLayout layout = current;
 	layout.id = SceneLayoutManager::Instance().GenerateId(name);
 	layout.name = name;
 	layout.builtin = false;
 
-	if (!SceneLayoutManager::Instance().AddOrReplace(layout))
+	if (!SceneLayoutManager::Instance().AddOrReplace(layout)) {
 		return;
+	}
 
 	SceneLayoutManager::Instance().Save();
 
@@ -548,17 +572,20 @@ void OBSBasicLayouts::OnDuplicate()
 
 void OBSBasicLayouts::OnRename()
 {
-	if (current.id.empty() || current.builtin)
+	if (current.id.empty() || current.builtin) {
 		return;
+	}
 
 	std::string name = current.name;
 
 	if (!NameDialog::AskForName(this, QTStr("Basic.Layouts.RenameLayout.Title"),
-				    QTStr("Basic.Layouts.RenameLayout.Text"), name))
+				    QTStr("Basic.Layouts.RenameLayout.Text"), name)) {
 		return;
+	}
 
-	if (name.empty())
+	if (name.empty()) {
 		return;
+	}
 
 	current.name = name;
 	CommitCurrentLayout();
@@ -568,15 +595,17 @@ void OBSBasicLayouts::OnRename()
 
 void OBSBasicLayouts::OnDelete()
 {
-	if (current.id.empty() || current.builtin)
+	if (current.id.empty() || current.builtin) {
 		return;
+	}
 
 	const QString name = GetLayoutDisplayName(current);
 	const auto button = OBSMessageBox::question(this, QTStr("Basic.Layouts.DeleteLayout.Title"),
 						    QTStr("Basic.Layouts.DeleteLayout.Text").arg(name));
 
-	if (button != QMessageBox::Yes)
+	if (button != QMessageBox::Yes) {
 		return;
+	}
 
 	SceneLayoutManager::Instance().Remove(current.id);
 	SceneLayoutManager::Instance().Save();
@@ -585,10 +614,11 @@ void OBSBasicLayouts::OnDelete()
 	RebuildPresets();
 
 	const auto &layouts = SceneLayoutManager::Instance().Layouts();
-	if (!layouts.empty())
+	if (!layouts.empty()) {
 		SelectLayout(layouts.front().id);
-	else
+	} else {
 		UpdateButtonStates();
+	}
 }
 
 void OBSBasicLayouts::OnImport()
@@ -596,8 +626,9 @@ void OBSBasicLayouts::OnImport()
 	const QString path = QFileDialog::getOpenFileName(this, QTStr("Basic.Layouts.Import"), QString(),
 							  QTStr("Basic.Layouts.FileFilter"));
 
-	if (path.isEmpty())
+	if (path.isEmpty()) {
 		return;
+	}
 
 	QString error;
 
@@ -609,32 +640,37 @@ void OBSBasicLayouts::OnImport()
 	RebuildPresets();
 
 	const auto &layouts = SceneLayoutManager::Instance().Layouts();
-	if (!layouts.empty())
+	if (!layouts.empty()) {
 		SelectLayout(layouts.back().id);
+	}
 }
 
 void OBSBasicLayouts::OnExport()
 {
-	if (current.id.empty())
+	if (current.id.empty()) {
 		return;
+	}
 
 	QString path = QFileDialog::getSaveFileName(this, QTStr("Basic.Layouts.Export"),
 						    GetLayoutDisplayName(current) + ".json",
 						    QTStr("Basic.Layouts.FileFilter"));
 
-	if (path.isEmpty())
+	if (path.isEmpty()) {
 		return;
+	}
 
 	QString error;
 
-	if (!SceneLayoutManager::Instance().ExportFile(path, current, error))
+	if (!SceneLayoutManager::Instance().ExportFile(path, current, error)) {
 		OBSMessageBox::warning(this, QTStr("Basic.Layouts.Export"), error);
+	}
 }
 
 void OBSBasicLayouts::OnAddSlot()
 {
-	if (current.builtin || current.slotList.size() >= kMaxLayoutSlots)
+	if (current.builtin || current.slotList.size() >= kMaxLayoutSlots) {
 		return;
+	}
 
 	/* New slots land slightly offset from the previous one so they are
 	 * immediately visible and grabbable instead of hiding underneath. */
@@ -661,13 +697,15 @@ void OBSBasicLayouts::OnAddSlot()
 
 void OBSBasicLayouts::OnRemoveSlot()
 {
-	if (current.builtin || current.slotList.size() <= 1)
+	if (current.builtin || current.slotList.size() <= 1) {
 		return;
+	}
 
 	int index = editor->SelectedSlot();
 
-	if (index < 0 || index >= (int)current.slotList.size())
+	if (index < 0 || index >= (int)current.slotList.size()) {
 		index = (int)current.slotList.size() - 1;
+	}
 
 	current.slotList.erase(current.slotList.begin() + index);
 
@@ -683,14 +721,16 @@ void OBSBasicLayouts::OnApply()
 {
 	OBSScene scene = CurrentScene();
 
-	if (!scene || current.slotList.empty())
+	if (!scene || current.slotList.empty()) {
 		return;
+	}
 
 	uint32_t cx = 0;
 	uint32_t cy = 0;
 
-	if (!GetSceneCanvasSize(scene, cx, cy))
+	if (!GetSceneCanvasSize(scene, cx, cy)) {
 		return;
+	}
 
 	const std::string undoData = SaveSceneTransforms(scene);
 
@@ -701,16 +741,19 @@ void OBSBasicLayouts::OnApply()
 	for (size_t i = 0; i < current.slotList.size() && i < slotCombos.size(); i++) {
 		const int64_t id = slotCombos[i]->currentData().toLongLong();
 
-		if (id == 0)
+		if (id == 0) {
 			continue;
+		}
 
 		obs_sceneitem_t *item = obs_scene_find_sceneitem_by_id(scene, id);
 
-		if (!item)
+		if (!item) {
 			continue;
+		}
 
-		if (ApplyLayoutSlot(item, current.slotList[i], cx, cy))
+		if (ApplyLayoutSlot(item, current.slotList[i], cx, cy)) {
 			obs_sceneitem_set_order_position(item, order++);
+		}
 	}
 
 	const std::string redoData = SaveSceneTransforms(scene);

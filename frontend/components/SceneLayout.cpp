@@ -94,16 +94,19 @@ static bool LayoutFromData(obs_data_t *data, SceneLayout &layout)
 	const char *id = obs_data_get_string(data, "id");
 	const char *name = obs_data_get_string(data, "name");
 
-	if (!id || !*id || !name || !*name)
+	if (!id || !*id || !name || !*name) {
 		return false;
+	}
 
 	OBSDataArrayAutoRelease slotArray = obs_data_get_array(data, "slots");
-	if (!slotArray)
+	if (!slotArray) {
 		return false;
+	}
 
 	const size_t count = obs_data_array_count(slotArray);
-	if (count == 0 || count > kMaxLayoutSlots)
+	if (count == 0 || count > kMaxLayoutSlots) {
 		return false;
+	}
 
 	layout.id = id;
 	layout.name = name;
@@ -192,8 +195,9 @@ const SceneLayout *SceneLayoutManager::Find(const std::string &id) const
 
 bool SceneLayoutManager::AddOrReplace(const SceneLayout &layout)
 {
-	if (layout.id.empty() || layout.slotList.empty() || layout.slotList.size() > kMaxLayoutSlots)
+	if (layout.id.empty() || layout.slotList.empty() || layout.slotList.size() > kMaxLayoutSlots) {
 		return false;
+	}
 
 	auto it = std::find_if(layouts.begin(), layouts.end(),
 			       [&layout](const SceneLayout &existing) { return existing.id == layout.id; });
@@ -202,8 +206,9 @@ bool SceneLayoutManager::AddOrReplace(const SceneLayout &layout)
 		/* Built-in layouts are part of the shipped set; overwriting one
 		 * would make the id mean different things on different
 		 * installations and break exported layouts. */
-		if (it->builtin)
+		if (it->builtin) {
 			return false;
+		}
 
 		*it = layout;
 		it->builtin = false;
@@ -220,8 +225,9 @@ bool SceneLayoutManager::Remove(const std::string &id)
 	auto it = std::find_if(layouts.begin(), layouts.end(),
 			       [&id](const SceneLayout &layout) { return layout.id == id; });
 
-	if (it == layouts.end() || it->builtin)
+	if (it == layouts.end() || it->builtin) {
 		return false;
+	}
 
 	layouts.erase(it);
 	return true;
@@ -232,20 +238,23 @@ std::string SceneLayoutManager::GenerateId(const std::string &name) const
 	std::string base = "user.";
 
 	for (char c : name) {
-		if (isalnum((unsigned char)c))
+		if (isalnum((unsigned char)c)) {
 			base += (char)tolower((unsigned char)c);
-		else if (!base.empty() && base.back() != '-')
+		} else if (!base.empty() && base.back() != '-') {
 			base += '-';
+		}
 	}
 
-	if (base == "user.")
+	if (base == "user.") {
 		base += "layout";
+	}
 
 	std::string id = base;
 	int suffix = 2;
 
-	while (Find(id))
+	while (Find(id)) {
 		id = base + "-" + std::to_string(suffix++);
+	}
 
 	return id;
 }
@@ -254,16 +263,19 @@ bool SceneLayoutManager::Load()
 {
 	char path[512];
 
-	if (GetAppConfigPath(path, sizeof(path), "obs-studio/layouts.json") <= 0)
+	if (GetAppConfigPath(path, sizeof(path), "obs-studio/layouts.json") <= 0) {
 		return false;
+	}
 
 	OBSDataAutoRelease root = obs_data_create_from_json_file_safe(path, "bak");
-	if (!root)
+	if (!root) {
 		return false;
+	}
 
 	OBSDataArrayAutoRelease array = obs_data_get_array(root, "layouts");
-	if (!array)
+	if (!array) {
 		return false;
+	}
 
 	/* Drop previously loaded user layouts but keep the built-in set. */
 	layouts.erase(std::remove_if(layouts.begin(), layouts.end(),
@@ -276,8 +288,9 @@ bool SceneLayoutManager::Load()
 		OBSDataAutoRelease item = obs_data_array_item(array, i);
 		SceneLayout layout;
 
-		if (LayoutFromData(item, layout))
+		if (LayoutFromData(item, layout)) {
 			AddOrReplace(layout);
+		}
 	}
 
 	return true;
@@ -287,15 +300,17 @@ bool SceneLayoutManager::Save() const
 {
 	char path[512];
 
-	if (GetAppConfigPath(path, sizeof(path), "obs-studio/layouts.json") <= 0)
+	if (GetAppConfigPath(path, sizeof(path), "obs-studio/layouts.json") <= 0) {
 		return false;
+	}
 
 	OBSDataAutoRelease root = obs_data_create();
 	OBSDataArrayAutoRelease array = obs_data_array_create();
 
 	for (const SceneLayout &layout : layouts) {
-		if (layout.builtin)
+		if (layout.builtin) {
 			continue;
+		}
 
 		OBSDataAutoRelease item = LayoutToData(layout);
 		obs_data_array_push_back(array, item);
@@ -328,14 +343,16 @@ bool SceneLayoutManager::ImportFile(const QString &path, QString &error)
 			OBSDataAutoRelease item = obs_data_array_item(array, i);
 			SceneLayout layout;
 
-			if (LayoutFromData(item, layout))
+			if (LayoutFromData(item, layout)) {
 				imported.push_back(std::move(layout));
+			}
 		}
 	} else {
 		SceneLayout layout;
 
-		if (LayoutFromData(root, layout))
+		if (LayoutFromData(root, layout)) {
 			imported.push_back(std::move(layout));
+		}
 	}
 
 	if (imported.empty()) {
@@ -346,8 +363,9 @@ bool SceneLayoutManager::ImportFile(const QString &path, QString &error)
 	for (SceneLayout &layout : imported) {
 		/* Never let an import silently overwrite an existing layout;
 		 * give the incoming one a fresh id instead. */
-		if (Find(layout.id))
+		if (Find(layout.id)) {
 			layout.id = GenerateId(layout.name);
+		}
 
 		AddOrReplace(layout);
 	}
@@ -375,16 +393,18 @@ bool SceneLayoutManager::ExportFile(const QString &path, const SceneLayout &layo
 
 QString GetLayoutDisplayName(const SceneLayout &layout)
 {
-	if (!layout.builtin)
+	if (!layout.builtin) {
 		return QString::fromStdString(layout.name);
+	}
 
 	/* Built-in names are translated; the stored English name is the
 	 * fallback when a translation is missing. */
 	const std::string key = "Basic.Layouts.Builtin." + layout.id.substr(layout.id.find('.') + 1);
 	const char *translated = nullptr;
 
-	if (App()->TranslateString(key.c_str(), &translated) && translated)
+	if (App()->TranslateString(key.c_str(), &translated) && translated) {
 		return QString::fromUtf8(translated);
+	}
 
 	return QString::fromStdString(layout.name);
 }
@@ -408,8 +428,9 @@ bool GetSceneCanvasSize(obs_scene_t *scene, uint32_t &cx, uint32_t &cy)
 		}
 	}
 
-	if (!obs_get_video_info(&ovi))
+	if (!obs_get_video_info(&ovi)) {
 		return false;
+	}
 
 	cx = ovi.base_width;
 	cy = ovi.base_height;
@@ -441,8 +462,9 @@ void GetLayoutSlotTransform(const LayoutSlot &slot, uint32_t canvasCX, uint32_t 
 
 bool ApplyLayoutSlot(obs_sceneitem_t *item, const LayoutSlot &slot, uint32_t canvasCX, uint32_t canvasCY)
 {
-	if (!item || obs_sceneitem_locked(item))
+	if (!item || obs_sceneitem_locked(item)) {
 		return false;
+	}
 
 	struct obs_transform_info info;
 	GetLayoutSlotTransform(slot, canvasCX, canvasCY, info);
@@ -502,8 +524,9 @@ std::string SaveSceneTransforms(obs_scene_t *scene)
 	/* Recorded so an undo entry can find its way back to the right scene
 	 * without holding a reference to it. */
 	obs_source_t *source = obs_scene_get_source(scene);
-	if (source)
+	if (source) {
 		obs_data_set_string(root, "scene_uuid", obs_source_get_uuid(source));
+	}
 
 	return obs_data_get_json(root);
 }
@@ -511,12 +534,14 @@ std::string SaveSceneTransforms(obs_scene_t *scene)
 void LoadSceneTransforms(obs_scene_t *scene, const std::string &data)
 {
 	OBSDataAutoRelease root = obs_data_create_from_json(data.c_str());
-	if (!root)
+	if (!root) {
 		return;
+	}
 
 	OBSDataArrayAutoRelease array = obs_data_get_array(root, "items");
-	if (!array)
+	if (!array) {
 		return;
+	}
 
 	const size_t count = obs_data_array_count(array);
 
@@ -525,8 +550,9 @@ void LoadSceneTransforms(obs_scene_t *scene, const std::string &data)
 		const int64_t id = obs_data_get_int(itemData, "id");
 
 		obs_sceneitem_t *item = obs_scene_find_sceneitem_by_id(scene, id);
-		if (!item)
+		if (!item) {
 			continue;
+		}
 
 		struct obs_transform_info info;
 		memset(&info, 0, sizeof(info));
@@ -552,31 +578,37 @@ void LoadSceneTransforms(obs_scene_t *scene, const std::string &data)
 	for (size_t i = 0; i < count; i++) {
 		OBSDataAutoRelease itemData = obs_data_array_item(array, i);
 
-		if (!obs_data_has_user_value(itemData, "order"))
+		if (!obs_data_has_user_value(itemData, "order")) {
 			continue;
+		}
 
 		obs_sceneitem_t *item = obs_scene_find_sceneitem_by_id(scene, obs_data_get_int(itemData, "id"));
 
-		if (item)
+		if (item) {
 			obs_sceneitem_set_order_position(item, (int)obs_data_get_int(itemData, "order"));
+		}
 	}
 }
 
 void RestoreSceneTransforms(const std::string &data)
 {
 	OBSDataAutoRelease root = obs_data_create_from_json(data.c_str());
-	if (!root)
+	if (!root) {
 		return;
+	}
 
 	const char *uuid = obs_data_get_string(root, "scene_uuid");
-	if (!uuid || !*uuid)
+	if (!uuid || !*uuid) {
 		return;
+	}
 
 	OBSSourceAutoRelease source = obs_get_source_by_uuid(uuid);
-	if (!source)
+	if (!source) {
 		return;
+	}
 
 	obs_scene_t *scene = obs_scene_from_source(source);
-	if (scene)
+	if (scene) {
 		LoadSceneTransforms(scene, data);
+	}
 }

@@ -36,18 +36,20 @@ LayoutView::LayoutView(QWidget *parent, Mode mode_) : QWidget(parent), mode(mode
 {
 	setMouseTracking(mode == Mode::Editor);
 
-	if (mode == Mode::Editor)
+	if (mode == Mode::Editor) {
 		setFocusPolicy(Qt::StrongFocus);
-	else
+	} else {
 		setCursor(Qt::PointingHandCursor);
+	}
 }
 
 void LayoutView::SetLayout(const SceneLayout &newLayout)
 {
 	layout = newLayout;
 
-	if (selectedSlot >= (int)layout.slotList.size())
+	if (selectedSlot >= (int)layout.slotList.size()) {
 		selectedSlot = -1;
+	}
 
 	update();
 }
@@ -96,8 +98,9 @@ QRectF LayoutView::CanvasRect() const
 {
 	QRectF available = QRectF(rect()).adjusted(kCanvasMargin, kCanvasMargin, -kCanvasMargin, -kCanvasMargin);
 
-	if (available.width() <= 0.0 || available.height() <= 0.0)
+	if (available.width() <= 0.0 || available.height() <= 0.0) {
 		return QRectF();
+	}
 
 	qreal w = available.width();
 	qreal h = w / aspect;
@@ -128,8 +131,9 @@ int LayoutView::SlotAt(const QPointF &pos) const
 		QRectF r = SlotRect(layout.slotList[i]);
 		r.adjust(-kHandleSize / 2.0, -kHandleSize / 2.0, kHandleSize / 2.0, kHandleSize / 2.0);
 
-		if (r.contains(pos))
+		if (r.contains(pos)) {
 			return i;
+		}
 	}
 
 	return -1;
@@ -137,8 +141,9 @@ int LayoutView::SlotAt(const QPointF &pos) const
 
 LayoutView::DragMode LayoutView::DragModeAt(const QPointF &pos, int slotIndex) const
 {
-	if (slotIndex < 0 || slotIndex >= (int)layout.slotList.size())
+	if (slotIndex < 0 || slotIndex >= (int)layout.slotList.size()) {
 		return DragMode::None;
+	}
 
 	const QRectF r = SlotRect(layout.slotList[slotIndex]);
 
@@ -147,30 +152,39 @@ LayoutView::DragMode LayoutView::DragModeAt(const QPointF &pos, int slotIndex) c
 	const bool top = std::fabs(pos.y() - r.top()) <= kHandleSize;
 	const bool bottom = std::fabs(pos.y() - r.bottom()) <= kHandleSize;
 
-	if (top && left)
+	if (top && left) {
 		return DragMode::ResizeTopLeft;
-	if (top && right)
+	}
+	if (top && right) {
 		return DragMode::ResizeTopRight;
-	if (bottom && left)
+	}
+	if (bottom && left) {
 		return DragMode::ResizeBottomLeft;
-	if (bottom && right)
+	}
+	if (bottom && right) {
 		return DragMode::ResizeBottomRight;
-	if (left)
+	}
+	if (left) {
 		return DragMode::ResizeLeft;
-	if (right)
+	}
+	if (right) {
 		return DragMode::ResizeRight;
-	if (top)
+	}
+	if (top) {
 		return DragMode::ResizeTop;
-	if (bottom)
+	}
+	if (bottom) {
 		return DragMode::ResizeBottom;
+	}
 
 	return r.contains(pos) ? DragMode::Move : DragMode::None;
 }
 
 void LayoutView::UpdateCursor(const QPointF &pos)
 {
-	if (mode != Mode::Editor)
+	if (mode != Mode::Editor) {
 		return;
+	}
 
 	switch (DragModeAt(pos, SlotAt(pos))) {
 	case DragMode::Move:
@@ -207,12 +221,14 @@ void LayoutView::ApplySnapping(LayoutSlot &slot, DragMode drag, bool disabled)
 
 	/* The editor deliberately reuses the preview's snapping preferences so
 	 * both surfaces behave the same way for the same user. */
-	if (disabled || !config_get_bool(config, "BasicWindow", "SnappingEnabled"))
+	if (disabled || !config_get_bool(config, "BasicWindow", "SnappingEnabled")) {
 		return;
+	}
 
 	const QRectF canvas = CanvasRect();
-	if (canvas.isEmpty())
+	if (canvas.isEmpty()) {
 		return;
+	}
 
 	const double distance = config_get_double(config, "BasicWindow", "SnapDistance");
 	const float thresholdX = (float)(distance / canvas.width());
@@ -235,8 +251,9 @@ void LayoutView::ApplySnapping(LayoutSlot &slot, DragMode drag, bool disabled)
 
 	if (config_get_bool(config, "BasicWindow", "SourceSnapping")) {
 		for (size_t i = 0; i < layout.slotList.size(); i++) {
-			if ((int)i == selectedSlot)
+			if ((int)i == selectedSlot) {
 				continue;
+			}
 
 			const LayoutSlot &other = layout.slotList[i];
 
@@ -249,8 +266,9 @@ void LayoutView::ApplySnapping(LayoutSlot &slot, DragMode drag, bool disabled)
 		}
 	}
 
-	if (targetsX.empty() && targetsY.empty())
+	if (targetsX.empty() && targetsY.empty()) {
 		return;
+	}
 
 	/* Only the edges the drag actually moves may snap; resizing the right
 	 * edge must not drag the left one along. */
@@ -321,14 +339,18 @@ void LayoutView::ApplySnapping(LayoutSlot &slot, DragMode drag, bool disabled)
 		edgesX = {slot.x, slot.x + slot.cx / 2.0f, slot.x + slot.cx};
 		edgesY = {slot.y, slot.y + slot.cy / 2.0f, slot.y + slot.cy};
 	} else {
-		if (snapLeft)
+		if (snapLeft) {
 			edgesX.push_back(slot.x);
-		if (snapRight)
+		}
+		if (snapRight) {
 			edgesX.push_back(slot.x + slot.cx);
-		if (snapTop)
+		}
+		if (snapTop) {
 			edgesY.push_back(slot.y);
-		if (snapBottom)
+		}
+		if (snapBottom) {
 			edgesY.push_back(slot.y + slot.cy);
+		}
 	}
 
 	float delta = 0.0f;
@@ -364,8 +386,9 @@ void LayoutView::ApplySnapping(LayoutSlot &slot, DragMode drag, bool disabled)
 
 void LayoutView::AlignSelectedSlot(AlignAction action)
 {
-	if (mode != Mode::Editor || selectedSlot < 0 || selectedSlot >= (int)layout.slotList.size())
+	if (mode != Mode::Editor || selectedSlot < 0 || selectedSlot >= (int)layout.slotList.size()) {
 		return;
+	}
 
 	LayoutSlot &slot = layout.slotList[selectedSlot];
 
@@ -408,8 +431,9 @@ void LayoutView::paintEvent(QPaintEvent *)
 	painter.setRenderHint(QPainter::Antialiasing);
 
 	const QRectF canvas = CanvasRect();
-	if (canvas.isEmpty())
+	if (canvas.isEmpty()) {
 		return;
+	}
 
 	const QPalette &pal = palette();
 
@@ -433,8 +457,9 @@ void LayoutView::paintEvent(QPaintEvent *)
 		painter.setBrush(fill);
 		painter.drawRect(r);
 
-		if (r.width() < 12.0 || r.height() < 12.0)
+		if (r.width() < 12.0 || r.height() < 12.0) {
 			continue;
+		}
 
 		QFont font = painter.font();
 		font.setBold(true);
@@ -443,7 +468,7 @@ void LayoutView::paintEvent(QPaintEvent *)
 		painter.setPen(pal.color(QPalette::HighlightedText));
 
 		const QString label = (mode == Mode::Editor && (int)i < slotLabels.size()) ? slotLabels.at((int)i)
-										      : QString();
+											   : QString();
 
 		if (label.isEmpty()) {
 			painter.drawText(r, Qt::AlignCenter, QString::number(i + 1));
@@ -463,8 +488,7 @@ void LayoutView::paintEvent(QPaintEvent *)
 		QRectF nameRect = r;
 		nameRect.setTop(r.center().y() + 2.0);
 
-		const QString elided =
-			painter.fontMetrics().elidedText(label, Qt::ElideRight, (int)r.width() - 8);
+		const QString elided = painter.fontMetrics().elidedText(label, Qt::ElideRight, (int)r.width() - 8);
 		painter.drawText(nameRect, Qt::AlignHCenter | Qt::AlignTop, elided);
 	}
 
@@ -539,12 +563,14 @@ void LayoutView::mouseMoveEvent(QMouseEvent *event)
 		return;
 	}
 
-	if (selectedSlot < 0 || selectedSlot >= (int)layout.slotList.size())
+	if (selectedSlot < 0 || selectedSlot >= (int)layout.slotList.size()) {
 		return;
+	}
 
 	const QRectF canvas = CanvasRect();
-	if (canvas.isEmpty())
+	if (canvas.isEmpty()) {
 		return;
+	}
 
 	const float dx = (float)((pos.x() - dragOrigin.x()) / canvas.width());
 	const float dy = (float)((pos.y() - dragOrigin.y()) / canvas.height());
