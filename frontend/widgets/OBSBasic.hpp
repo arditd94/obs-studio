@@ -52,6 +52,7 @@ class OBSBasicAdvAudio;
 class OBSBasicFilters;
 class OBSBasicInteraction;
 class OBSBasicLayouts;
+class OBSBasicProjections;
 class SceneDock;
 class OBSBasicProperties;
 class OBSBasicSourceSelect;
@@ -972,6 +973,8 @@ private:
 	QList<QPointer<OBSProjector>> projectOutputs;
 
 	QList<ProjectionEntry> projectionEntries;
+
+	QPointer<OBSBasicProjections> projectionsDialog;
 	QPointer<QMenu> previewProjector;
 	QPointer<QMenu> previewProjectorSource;
 	QPointer<QMenu> previewProjectorMain;
@@ -997,18 +1000,28 @@ private slots:
 	void openMultiviewWindow();
 
 	void SetProjectButtonActive(bool active);
+	void UpdateProjectButtonState();
 
 	void StartProjections();
 	void StopProjections();
 
 public:
-	/* Used by the projection panel to read and replace the configured
-	 * lines. Replacing them restarts any running projection. */
+	/* Read and edited by the projection panel. Each entry has an optional
+	 * running projector at the same index in projectOutputs. */
 	const QList<ProjectionEntry> &GetProjections() const { return projectionEntries; }
-	void SetProjections(const QList<ProjectionEntry> &entries);
+
+	bool IsProjectionActive(int index) const;
+	void SetProjectionActive(int index, bool active);
+
+	void AddProjectionEntry(const ProjectionEntry &entry);
+	void RemoveProjectionEntry(int index);
+	void SetProjectionEntry(int index, const ProjectionEntry &entry);
 
 	void LoadProjections();
 	void SaveProjections();
+
+signals:
+	void projectionsChanged();
 
 private:
 

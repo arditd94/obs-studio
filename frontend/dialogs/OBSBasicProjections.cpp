@@ -21,6 +21,7 @@
 #include <qt-wrappers.hpp>
 #include <widgets/OBSBasic.hpp>
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
@@ -35,27 +36,24 @@ OBSBasicProjections::OBSBasicProjections(OBSBasic *parent) : QDialog(parent), ma
 {
 	setWindowTitle(QTStr("Basic.Projections"));
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-	resize(640, 380);
+	resize(720, 400);
 
 	BuildUI();
+	Refresh();
 
-	const QList<ProjectionEntry> entries = main->GetProjections();
-
-	for (const ProjectionEntry &entry : entries) {
-		const int row = table->rowCount();
-		table->insertRow(row);
-		FillRow(row, entry.sceneUuid, entry.monitor);
-	}
-
-	UpdateWarning();
+	/* The state also changes from the master button or from a projector
+	 * being dismissed, so the panel follows rather than owns it. */
+	connect(main, &OBSBasic::projectionsChanged, this, &OBSBasicProjections::Refresh);
 }
 
 void OBSBasicProjections::BuildUI()
 {
-	table = new QTableWidget(0, 2, this);
-	table->setHorizontalHeaderLabels({QTStr("Basic.Projections.Content"), QTStr("Basic.Projections.Screen")});
+	table = new QTableWidget(0, 3, this);
+	table->setHorizontalHeaderLabels(
+		{QTStr("Basic.Projections.Content"), QTStr("Basic.Projections.Screen"), QTStr("Basic.Projections.On")});
 	table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
 	table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+	table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
 	table->verticalHeader()->setVisible(false);
 	table->setSelectionBehavior(QAbstractItemView::SelectRows);
 	table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -84,6 +82,13 @@ void OBSBasicProjections::BuildUI()
 		}
 	}
 
+	/* Applies to both the master switch and the per-row ones, so it is
+	 * stored the moment it changes. */
+	connect(fadeCombo, &QComboBox::currentIndexChanged, this, [this]() {
+		config_set_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration",
+			       fadeCombo->currentData().toInt());
+	});
+
 	QHBoxLayout *fadeRow = new QHBoxLayout();
 	fadeRow->addWidget(new QLabel(QTStr("Basic.Project.Fade"), this));
 	fadeRow->addWidget(fadeCombo);
@@ -92,9 +97,8 @@ void OBSBasicProjections::BuildUI()
 	warningLabel = new QLabel(this);
 	warningLabel->setWordWrap(true);
 
-	QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-	connect(buttons, &QDialogButtonBox::accepted, this, &OBSBasicProjections::OnAccept);
-	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+	QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
+	connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::close);
 
 	QVBoxLayout *layout = new QVBoxLayout();
 	layout->addWidget(table, 1);
@@ -105,7 +109,7 @@ void OBSBasicProjections::BuildUI()
 	setLayout(layout);
 }
 
-QComboBox *OBSBasicProjections::CreateSceneCombo(const QString &sceneUuid)
+QComboBox *OBSBasicProjections::CreateSceneCombo(const QString &sceneUuid, int row)
 {
 	QComboBox *combo = new QComboBox();
 
@@ -133,12 +137,12 @@ QComboBox *OBSBasicProjections::CreateSceneCombo(const QString &sceneUuid)
 	const int index = combo->findData(sceneUuid);
 	combo->setCurrentIndex(index >= 0 ? index : 0);
 
-	connect(combo, &QComboBox::currentIndexChanged, this, [this]() { UpdateWarning(); });
+	connect(combo, &QComboBox::currentIndexChanged, this, [this, row]() { CommitRow(row); });
 
 	return combo;
 }
 
-QComboBox *OBSBasicProjections::CreateMonitorCombo(int monitor)
+QComboBox *OBSBasicProjections::CreateMonitorCombo(int monitor, int row)
 {
 	QComboBox *combo = new QComboBox();
 
@@ -151,15 +155,71 @@ QComboBox *OBSBasicProjections::CreateMonitorCombo(int monitor)
 	const int index = combo->findData(monitor);
 	combo->setCurrentIndex(index >= 0 ? index : 0);
 
-	connect(combo, &QComboBox::currentIndexChanged, this, [this]() { UpdateWarning(); });
+	connect(combo, &QComboBox::currentIndexChanged, this, [this, row]() { CommitRow(row); });
 
 	return combo;
 }
 
-void OBSBasicProjections::FillRow(int row, const QString &sceneUuid, int monitor)
+void OBSBasicProjections::Refresh()
 {
-	table->setCellWidget(row, 0, CreateSceneCombo(sceneUuid));
-	table->setCellWidget(row, 1, CreateMonitorCombo(monitor));
+	refreshing = true;
+
+	const QList<ProjectionEntry> entries = main->GetProjections();
+
+	table->setRowCount(0);
+
+	for (int row = 0; row < entries.size(); row++) {
+		table->insertRow(row);
+		table->setCellWidget(row, 0, CreateSceneCombo(entries[row].sceneUuid, row));
+		table->setCellWidget(row, 1, CreateMonitorCombo(entries[row].monitor, row));
+
+		QCheckBox *check = new QCheckBox();
+		check->setChecked(main->IsProjectionActive(row));
+
+		connect(check, &QCheckBox::toggled, this, [this, row](bool on) {
+			if (!refreshing) {
+				main->SetProjectionActive(row, on);
+			}
+		});
+
+		/* Centred in its cell, since a bare checkbox hugs the left edge
+		 * and reads as belonging to the screen column. */
+		QWidget *holder = new QWidget();
+		QHBoxLayout *holderLayout = new QHBoxLayout(holder);
+		holderLayout->setContentsMargins(0, 0, 0, 0);
+		holderLayout->setAlignment(Qt::AlignCenter);
+		holderLayout->addWidget(check);
+
+		table->setCellWidget(row, 2, holder);
+	}
+
+	removeButton->setEnabled(table->rowCount() > 0);
+
+	refreshing = false;
+
+	UpdateWarning();
+}
+
+void OBSBasicProjections::CommitRow(int row)
+{
+	if (refreshing || row < 0 || row >= table->rowCount()) {
+		return;
+	}
+
+	QComboBox *sceneCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 0));
+	QComboBox *monitorCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 1));
+
+	if (!sceneCombo || !monitorCombo) {
+		return;
+	}
+
+	ProjectionEntry entry;
+	entry.sceneUuid = sceneCombo->currentData().toString();
+	entry.monitor = monitorCombo->currentData().toInt();
+
+	main->SetProjectionEntry(row, entry);
+
+	UpdateWarning();
 }
 
 void OBSBasicProjections::UpdateWarning()
@@ -167,37 +227,29 @@ void OBSBasicProjections::UpdateWarning()
 	QSet<int> seen;
 	bool duplicate = false;
 
-	for (int row = 0; row < table->rowCount(); row++) {
-		QComboBox *monitorCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 1));
-
-		if (!monitorCombo) {
-			continue;
-		}
-
-		const int monitor = monitorCombo->currentData().toInt();
-
-		if (seen.contains(monitor)) {
+	for (const ProjectionEntry &entry : main->GetProjections()) {
+		if (seen.contains(entry.monitor)) {
 			duplicate = true;
 			break;
 		}
 
-		seen.insert(monitor);
+		seen.insert(entry.monitor);
 	}
 
 	/* A screen can only show one thing, so a duplicate is flagged rather
 	 * than silently dropped when the projection starts. */
 	warningLabel->setText(duplicate ? QTStr("Basic.Projections.DuplicateScreen") : QString());
-	removeButton->setEnabled(table->rowCount() > 0);
 }
 
 void OBSBasicProjections::OnAdd()
 {
-	const int row = table->rowCount();
-	table->insertRow(row);
-	FillRow(row, QString(), 0);
-	table->selectRow(row);
+	ProjectionEntry entry;
+	entry.sceneUuid = QString();
+	entry.monitor = 0;
 
-	UpdateWarning();
+	main->AddProjectionEntry(entry);
+
+	table->selectRow(table->rowCount() - 1);
 }
 
 void OBSBasicProjections::OnRemove()
@@ -208,36 +260,5 @@ void OBSBasicProjections::OnRemove()
 		return;
 	}
 
-	table->removeRow(row);
-	UpdateWarning();
-}
-
-void OBSBasicProjections::Apply()
-{
-	QList<ProjectionEntry> entries;
-
-	for (int row = 0; row < table->rowCount(); row++) {
-		QComboBox *sceneCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 0));
-		QComboBox *monitorCombo = qobject_cast<QComboBox *>(table->cellWidget(row, 1));
-
-		if (!sceneCombo || !monitorCombo) {
-			continue;
-		}
-
-		ProjectionEntry entry;
-		entry.sceneUuid = sceneCombo->currentData().toString();
-		entry.monitor = monitorCombo->currentData().toInt();
-
-		entries.append(entry);
-	}
-
-	config_set_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration", fadeCombo->currentData().toInt());
-
-	main->SetProjections(entries);
-}
-
-void OBSBasicProjections::OnAccept()
-{
-	Apply();
-	accept();
+	main->RemoveProjectionEntry(row);
 }

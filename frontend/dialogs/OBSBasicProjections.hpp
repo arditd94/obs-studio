@@ -25,8 +25,11 @@ class QLabel;
 class QPushButton;
 class QTableWidget;
 
-/* Lists what goes to which screen. One row per projection: a scene, or the
- * program output, paired with a screen. */
+/* Lists what goes to which screen, one row per projection: a scene or the
+ * program output, a screen, and a switch for that line alone.
+ *
+ * Edits apply immediately rather than on OK, since the panel is meant to stay
+ * open beside the mixer while a show runs. */
 class OBSBasicProjections : public QDialog {
 	Q_OBJECT
 
@@ -37,21 +40,22 @@ class OBSBasicProjections : public QDialog {
 	QPushButton *removeButton = nullptr;
 	QLabel *warningLabel = nullptr;
 
+	/* Set while the table is being rebuilt from the current state, so the
+	 * widgets' own signals do not write back what they just displayed. */
+	bool refreshing = false;
+
 	void BuildUI();
-	void FillRow(int row, const QString &sceneUuid, int monitor);
+	void Refresh();
 
-	/* Scene combo entries carry the uuid; the program output uses an empty
-	 * one so it survives scene renames. */
-	QComboBox *CreateSceneCombo(const QString &sceneUuid);
-	QComboBox *CreateMonitorCombo(int monitor);
+	QComboBox *CreateSceneCombo(const QString &sceneUuid, int row);
+	QComboBox *CreateMonitorCombo(int monitor, int row);
 
+	void CommitRow(int row);
 	void UpdateWarning();
-	void Apply();
 
 private slots:
 	void OnAdd();
 	void OnRemove();
-	void OnAccept();
 
 public:
 	explicit OBSBasicProjections(OBSBasic *parent);
