@@ -54,6 +54,7 @@ class OBSBasicLayouts : public QDialog {
 	QLabel *statusLabel = nullptr;
 
 	QPushButton *applyButton = nullptr;
+	QPushButton *invertButton = nullptr;
 	QPushButton *duplicateButton = nullptr;
 	QPushButton *deleteButton = nullptr;
 	QPushButton *renameButton = nullptr;
@@ -94,6 +95,7 @@ private slots:
 	void OnRemoveSlot();
 	void OnEditorChanged();
 	void OnSlotSelected(int index);
+	void OnInvert();
 
 public:
 	explicit OBSBasicLayouts(OBSBasic *parent);

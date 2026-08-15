@@ -112,8 +112,13 @@ void OBSBasicLayouts::BuildUI()
 	slotScroll->setWidgetResizable(true);
 	slotScroll->setFrameShape(QFrame::NoFrame);
 
+	invertButton = new QPushButton(QTStr("Basic.Layouts.Invert"), this);
+	invertButton->setToolTip(QTStr("Basic.Layouts.Invert.Tooltip"));
+	connect(invertButton, &QPushButton::clicked, this, &OBSBasicLayouts::OnInvert);
+
 	QVBoxLayout *slotGroupLayout = new QVBoxLayout();
-	slotGroupLayout->addWidget(slotScroll);
+	slotGroupLayout->addWidget(slotScroll, 1);
+	slotGroupLayout->addWidget(invertButton);
 	slotGroup->setLayout(slotGroupLayout);
 	slotGroup->setMinimumWidth(260);
 	slotGroup->setMaximumWidth(340);
@@ -394,6 +399,10 @@ void OBSBasicLayouts::UpdateButtonStates()
 		button->setEnabled(canAlign);
 	applyButton->setEnabled(hasLayout && hasScene);
 
+	/* Inverting acts on the assignments, not the layout, so it stays
+	 * available on read-only built-in layouts too. */
+	invertButton->setEnabled(slotCombos.size() >= 2);
+
 	if (!hasScene)
 		statusLabel->setText(QTStr("Basic.Layouts.NoScene"));
 	else if (hasLayout && current.builtin)
@@ -442,6 +451,26 @@ void OBSBasicLayouts::OnSlotSelected(int index)
 {
 	UNUSED_PARAMETER(index);
 	UpdateButtonStates();
+}
+
+void OBSBasicLayouts::OnInvert()
+{
+	/* Reverses the assignment order rather than the layout geometry: the
+	 * boxes stay where they are and the sources trade places, which is what
+	 * "the cameras came out the wrong way round" calls for. With two slots
+	 * this is simply a swap. */
+	const size_t count = slotCombos.size();
+
+	if (count < 2)
+		return;
+
+	for (size_t i = 0; i < count / 2; i++) {
+		const int first = slotCombos[i]->currentIndex();
+		const int second = slotCombos[count - 1 - i]->currentIndex();
+
+		slotCombos[i]->setCurrentIndex(second);
+		slotCombos[count - 1 - i]->setCurrentIndex(first);
+	}
 }
 
 void OBSBasicLayouts::OnAdd()
