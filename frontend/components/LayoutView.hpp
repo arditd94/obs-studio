@@ -19,6 +19,7 @@
 
 #include <components/SceneLayout.hpp>
 
+#include <QStringList>
 #include <QWidget>
 
 /* Draws a layout as a canvas-proportioned rectangle with one numbered box per
@@ -36,6 +37,8 @@ public:
 private:
 	SceneLayout layout;
 	Mode mode = Mode::Preview;
+
+	QStringList slotLabels;
 
 	bool selected = false;
 	int selectedSlot = -1;
@@ -97,6 +100,11 @@ public:
 	const SceneLayout &Layout() const { return layout; }
 
 	void SetAspect(double newAspect);
+
+	/* Names of the sources currently assigned to each slot, drawn under the
+	 * slot number in Editor mode so reassignments are visible in place.
+	 * Entries may be empty for unassigned slots. */
+	void SetSlotLabels(const QStringList &labels);
 
 	void SetSelected(bool value);
 	bool Selected() const { return selected; }

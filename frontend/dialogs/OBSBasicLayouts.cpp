@@ -354,12 +354,28 @@ void OBSBasicLayouts::RebuildSlotRows()
 				combo->setCurrentIndex(index);
 		}
 
+		connect(combo, &QComboBox::currentTextChanged, this, [this]() { UpdateSlotLabels(); });
+
 		rowLayout->addWidget(label);
 		rowLayout->addWidget(combo, 1);
 
 		slotBox->addWidget(row);
 		slotCombos.push_back(combo);
 	}
+
+	UpdateSlotLabels();
+}
+
+void OBSBasicLayouts::UpdateSlotLabels()
+{
+	QStringList labels;
+
+	for (QComboBox *combo : slotCombos) {
+		/* A slot left on "None" gets no caption rather than the word. */
+		labels.append(combo->currentData().toLongLong() == 0 ? QString() : combo->currentText());
+	}
+
+	editor->SetSlotLabels(labels);
 }
 
 void OBSBasicLayouts::PopulateSourceCombo(QComboBox *combo, int slotIndex)
@@ -471,6 +487,8 @@ void OBSBasicLayouts::OnInvert()
 		slotCombos[i]->setCurrentIndex(second);
 		slotCombos[count - 1 - i]->setCurrentIndex(first);
 	}
+
+	UpdateSlotLabels();
 }
 
 void OBSBasicLayouts::OnAdd()

@@ -52,6 +52,14 @@ void LayoutView::SetLayout(const SceneLayout &newLayout)
 	update();
 }
 
+void LayoutView::SetSlotLabels(const QStringList &labels)
+{
+	if (slotLabels != labels) {
+		slotLabels = labels;
+		update();
+	}
+}
+
 void LayoutView::SetAspect(double newAspect)
 {
 	if (newAspect > 0.0) {
@@ -433,7 +441,31 @@ void LayoutView::paintEvent(QPaintEvent *)
 		font.setPointSizeF(std::clamp(r.height() / 4.0, 7.0, 22.0));
 		painter.setFont(font);
 		painter.setPen(pal.color(QPalette::HighlightedText));
-		painter.drawText(r, Qt::AlignCenter, QString::number(i + 1));
+
+		const QString label = (mode == Mode::Editor && (int)i < slotLabels.size()) ? slotLabels.at((int)i)
+										      : QString();
+
+		if (label.isEmpty()) {
+			painter.drawText(r, Qt::AlignCenter, QString::number(i + 1));
+			continue;
+		}
+
+		/* Number above, assigned source below, so reassigning or reversing
+		 * is visible in the box itself rather than only in the dropdowns. */
+		QRectF numberRect = r;
+		numberRect.setHeight(r.height() / 2.0);
+		painter.drawText(numberRect, Qt::AlignHCenter | Qt::AlignBottom, QString::number(i + 1));
+
+		font.setBold(false);
+		font.setPointSizeF(std::clamp(r.height() / 9.0, 6.5, 11.0));
+		painter.setFont(font);
+
+		QRectF nameRect = r;
+		nameRect.setTop(r.center().y() + 2.0);
+
+		const QString elided =
+			painter.fontMetrics().elidedText(label, Qt::ElideRight, (int)r.width() - 8);
+		painter.drawText(nameRect, Qt::AlignHCenter | Qt::AlignTop, elided);
 	}
 
 	/* Snap guides, shown only while a drag is actually snapped so they read

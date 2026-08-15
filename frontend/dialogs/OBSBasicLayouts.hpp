@@ -74,6 +74,10 @@ class OBSBasicLayouts : public QDialog {
 	void RebuildPresets();
 	void RebuildSlotRows();
 	void PopulateSourceCombo(QComboBox *combo, int slotIndex);
+
+	/* Pushes the current assignment names into the editor so each box shows
+	 * which source it holds. */
+	void UpdateSlotLabels();
 	void SelectLayout(const std::string &id);
 	void UpdateButtonStates();
 	void CommitCurrentLayout();
