@@ -96,6 +96,13 @@ enum class QtDataRole {
 	OBSSignals,
 };
 
+/* One line of the projection panel: which scene goes to which screen. An empty
+ * sceneUuid means the program output, which follows scene changes. */
+struct ProjectionEntry {
+	QString sceneUuid;
+	int monitor = 0;
+};
+
 struct SavedProjectorInfo {
 	ProjectorType type;
 	int monitor;
@@ -959,10 +966,12 @@ public slots:
 private:
 	std::vector<OBSProjector *> projectors;
 
-	/* Projector driven by the Project button, kept apart from the ad-hoc
+	/* Projectors driven by the Project button, kept apart from the ad-hoc
 	 * ones so toggling the button never closes a projector the user opened
 	 * by hand. */
-	QPointer<OBSProjector> projectOutput;
+	QList<QPointer<OBSProjector>> projectOutputs;
+
+	QList<ProjectionEntry> projectionEntries;
 	QPointer<QMenu> previewProjector;
 	QPointer<QMenu> previewProjectorSource;
 	QPointer<QMenu> previewProjectorMain;
@@ -989,10 +998,25 @@ private slots:
 
 	void SetProjectButtonActive(bool active);
 
+	void StartProjections();
+	void StopProjections();
+
+public:
+	/* Used by the projection panel to read and replace the configured
+	 * lines. Replacing them restarts any running projection. */
+	const QList<ProjectionEntry> &GetProjections() const { return projectionEntries; }
+	void SetProjections(const QList<ProjectionEntry> &entries);
+
+	void LoadProjections();
+	void SaveProjections();
+
+private:
+
 private slots:
 	/* Auto-connected by name, so these have to be declared as slots. */
 	void on_projectButton_toggled(bool checked);
 	void on_projectSettingsButton_clicked();
+	void ProjectionClosed(QObject *projector);
 
 public:
 	void DeleteProjector(OBSProjector *projector);

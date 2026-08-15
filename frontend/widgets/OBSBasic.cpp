@@ -1244,6 +1244,7 @@ void OBSBasic::OBSInit()
 	connect(sceneDocksMenu, &QMenu::aboutToShow, this, &OBSBasic::UpdateSceneDocksMenu);
 
 	LoadSceneDocks();
+	LoadProjections();
 
 #ifdef YOUTUBE_ENABLED
 	/* setup YouTube app dock */
