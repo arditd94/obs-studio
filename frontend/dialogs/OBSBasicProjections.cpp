@@ -292,6 +292,16 @@ void OBSBasicProjections::Refresh()
 		table->setCellWidget(row, 4, lockHolder);
 	}
 
+	/* The fade can also be changed from the remote page, so the combo is
+	 * pulled back into line here rather than only when the panel opens. */
+	const int fade = main->ProjectionFadeDuration();
+	const int fadeIndex = fadeCombo->findData(fade);
+
+	if (fadeIndex >= 0 && fadeIndex != fadeCombo->currentIndex()) {
+		QSignalBlocker block(fadeCombo);
+		fadeCombo->setCurrentIndex(fadeIndex);
+	}
+
 	removeButton->setEnabled(table->rowCount() > 0);
 
 	refreshing = false;

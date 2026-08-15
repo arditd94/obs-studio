@@ -430,6 +430,19 @@ void OBSBasic::SetProjectionsRunning(bool running)
 	ui->projectButton->setChecked(running);
 }
 
+int OBSBasic::ProjectionFadeDuration() const
+{
+	return (int)ProjectionFadeMs();
+}
+
+void OBSBasic::SetProjectionFadeDuration(int ms)
+{
+	config_set_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration", ms);
+
+	/* The panel shows the same setting, so it is told to catch up. */
+	emit projectionsChanged();
+}
+
 void OBSBasic::SetProjectionEnabled(int index, bool enabled)
 {
 	if (index < 0 || index >= projectionEntries.size() || projectionEntries[index].enabled == enabled) {

@@ -184,6 +184,7 @@ QByteArray ProjectionServer::StateJson() const
 	QJsonObject state;
 	state["rows"] = rows;
 	state["running"] = main->AreProjectionsRunning();
+	state["fade"] = main->ProjectionFadeDuration();
 
 	return QJsonDocument(state).toJson(QJsonDocument::Compact);
 }
@@ -242,6 +243,12 @@ void ProjectionServer::HandleRequest(QTcpSocket *socket, const QString &request)
 
 	if (path == "/master") {
 		main->SetProjectionsRunning(on);
+		Respond(socket, 200, "application/json", StateJson());
+		return;
+	}
+
+	if (path == "/fade") {
+		main->SetProjectionFadeDuration(query.queryItemValue("ms").toInt());
 		Respond(socket, 200, "application/json", StateJson());
 		return;
 	}
@@ -311,6 +318,14 @@ QByteArray ProjectionServer::ControlPage()
  .master { width:100%; padding:16px; border-radius:12px; font-size:16px; font-weight:800;
            letter-spacing:.06em; background:var(--off); margin-bottom:18px; }
  .master.on { background:var(--live); }
+
+ .fade { background:var(--card); border-radius:14px; padding:14px 16px; margin-bottom:16px; }
+ .fade h2 { font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--dim);
+            margin:0 0 10px; }
+ .fade .opts { display:flex; gap:8px; flex-wrap:wrap; }
+ .fade button { flex:1; min-width:64px; height:42px; border-radius:9px; background:var(--off);
+                font-size:14px; font-weight:700; }
+ .fade button.sel { background:#3d6fd6; }
 </style>
 </head>
 <body>
@@ -318,7 +333,7 @@ QByteArray ProjectionServer::ControlPage()
 <div id="gate">
   <h1>Proiezioni</h1>
   <p>Controllo remoto della regia</p>
-  <input id="key" type="password" inputmode="numeric" value="1408" autocomplete="off">
+  <input id="key" type="password" inputmode="numeric" placeholder="Password" autocomplete="off" autofocus>
   <button onclick="enter()">Entra</button>
   <div id="err"></div>
 </div>
@@ -326,6 +341,7 @@ QByteArray ProjectionServer::ControlPage()
 <div id="main">
   <header><span id="dot"></span><h1>Proiezioni</h1></header>
   <button id="master" class="master" onclick="toggleMaster()">PROIEZIONE</button>
+  <div class="fade"><h2>Dissolvenza</h2><div class="opts" id="fades"></div></div>
   <div id="screens"></div>
 </div>
 
@@ -346,7 +362,7 @@ function enter() {
   api("/state").then(state => {
     document.getElementById("gate").style.display = "none";
     document.getElementById("main").style.display = "block";
-    render(state);
+    render(state, true);
   }).catch(e => {
     document.getElementById("err").textContent =
       (e.message === "403") ? "Password errata" : "Nessuna risposta dalla regia";
@@ -354,10 +370,27 @@ function enter() {
 }
 
 let running = false;
+let lastState = "";
 
-function render(state) {
+/* Rebuilding the list on every poll would move a button out from under a
+   finger mid-press, so nothing is redrawn unless something actually changed. */
+function render(state, force) {
+  const signature = JSON.stringify(state);
+  if (!force && signature === lastState) return;
+  lastState = signature;
+
   document.getElementById("dot").className = "ok";
   running = state.running;
+
+  const fades = document.getElementById("fades");
+  fades.innerHTML = "";
+  [0, 250, 500, 1000, 2000].forEach(ms => {
+    const b = document.createElement("button");
+    b.textContent = ms === 0 ? "Nessuna" : ms + " ms";
+    if (ms === state.fade) b.className = "sel";
+    b.onclick = () => setFade(ms);
+    fades.appendChild(b);
+  });
 
   const master = document.getElementById("master");
   master.textContent = running ? "PROIEZIONE ATTIVA" : "PROIEZIONE SPENTA";
@@ -432,6 +465,14 @@ function render(state) {
 
     wrap.appendChild(card);
   });
+}
+
+function setFade(ms) {
+  busy = true;
+  api("/fade", {ms: ms})
+    .then(render)
+    .catch(() => { document.getElementById("dot").className = "bad"; })
+    .finally(() => { busy = false; });
 }
 
 function toggleMaster() {

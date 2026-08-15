@@ -1034,6 +1034,9 @@ public:
 	bool AreProjectionsRunning() const { return projectionsRunning; }
 	void SetProjectionsRunning(bool running);
 
+	int ProjectionFadeDuration() const;
+	void SetProjectionFadeDuration(int ms);
+
 	void SetProjectionEnabled(int index, bool enabled);
 	void SetProjectionLocked(int index, bool locked);
 	void MoveProjectionEntry(int from, int to);
