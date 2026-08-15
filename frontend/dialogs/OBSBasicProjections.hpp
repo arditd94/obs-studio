@@ -53,6 +53,9 @@ class OBSBasicProjections : public QDialog {
 	void CommitRow(int row);
 	void UpdateWarning();
 
+protected:
+	bool eventFilter(QObject *watched, QEvent *event) override;
+
 private slots:
 	void OnAdd();
 	void OnRemove();

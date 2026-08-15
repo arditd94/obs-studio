@@ -24,12 +24,14 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QDropEvent>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
 #include <QSet>
 #include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QVBoxLayout>
 
 OBSBasicProjections::OBSBasicProjections(OBSBasic *parent) : QDialog(parent), main(parent)
@@ -60,6 +62,13 @@ void OBSBasicProjections::BuildUI()
 	table->verticalHeader()->setVisible(false);
 	table->setSelectionBehavior(QAbstractItemView::SelectRows);
 	table->setSelectionMode(QAbstractItemView::SingleSelection);
+
+	/* Rows are layers, so they are reordered by dragging. The drop is
+	 * handled here rather than by the view because the cell widgets do not
+	 * travel with a row the view moves itself. */
+	table->setDragDropMode(QAbstractItemView::InternalMove);
+	table->setDragDropOverwriteMode(false);
+	table->viewport()->installEventFilter(this);
 
 	QPushButton *addButton = new QPushButton(QTStr("Basic.Projections.Add"), this);
 	removeButton = new QPushButton(QTStr("Basic.Projections.Remove"), this);
@@ -191,29 +200,13 @@ void OBSBasicProjections::Refresh()
 		orderLayout->setContentsMargins(0, 0, 0, 0);
 		orderLayout->setSpacing(1);
 
-		/* Hollow triangles rather than solid ones: they read as controls to
-		 * press instead of a state indicator. */
-		QPushButton *upButton = new QPushButton(QString::fromUtf8("△"));
-		QPushButton *downButton = new QPushButton(QString::fromUtf8("▽"));
-
-		for (QPushButton *button : {upButton, downButton}) {
-			button->setFixedWidth(26);
-			button->setFlat(true);
-		}
-
-		upButton->setEnabled(row > 0);
-		downButton->setEnabled(row < entries.size() - 1);
-		upButton->setToolTip(QTStr("Basic.Projections.MoveUp"));
-		downButton->setToolTip(QTStr("Basic.Projections.MoveDown"));
-
-		connect(upButton, &QPushButton::clicked, this, [this, row]() { main->MoveProjectionEntry(row, row - 1); });
-		connect(downButton, &QPushButton::clicked, this,
-			[this, row]() { main->MoveProjectionEntry(row, row + 2); });
-
-		orderLayout->addWidget(upButton);
-		orderLayout->addWidget(downButton);
-
-		table->setCellWidget(row, 0, orderHolder);
+		/* A plain item, not a widget: it is the only cell left that a
+		 * press can reach, so it doubles as the grip for the drag. */
+		QTableWidgetItem *handle = new QTableWidgetItem(QString::fromUtf8("⇳"));
+		handle->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled);
+		handle->setTextAlignment(Qt::AlignCenter);
+		handle->setToolTip(QTStr("Basic.Projections.DragHint"));
+		table->setItem(row, 0, handle);
 
 		table->setCellWidget(row, 1, CreateSceneCombo(entries[row].sceneUuid, row));
 		table->setCellWidget(row, 2, CreateMonitorCombo(entries[row].monitor, row));
@@ -304,6 +297,33 @@ void OBSBasicProjections::UpdateWarning()
 	/* Several lines on one screen is the point rather than a mistake: the
 	 * hint explains which one wins. */
 	warningLabel->setText(QTStr("Basic.Projections.LayerHint"));
+}
+
+bool OBSBasicProjections::eventFilter(QObject *watched, QEvent *event)
+{
+	if (watched == table->viewport() && event->type() == QEvent::Drop) {
+		QDropEvent *drop = static_cast<QDropEvent *>(event);
+		const int from = table->currentRow();
+
+		const QModelIndex target = table->indexAt(drop->position().toPoint());
+		int to = target.isValid() ? target.row() : table->rowCount();
+
+		/* Dropping on the lower half of a row means after it. */
+		if (target.isValid()) {
+			const QRect rect = table->visualRect(target);
+
+			if (drop->position().toPoint().y() > rect.center().y()) {
+				to += 1;
+			}
+		}
+
+		main->MoveProjectionEntry(from, to);
+
+		drop->accept();
+		return true;
+	}
+
+	return QDialog::eventFilter(watched, event);
 }
 
 void OBSBasicProjections::OnAdd()
