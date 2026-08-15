@@ -53,6 +53,15 @@ class SourceDock : public OBSDock {
 
 	void UpdateButtons(obs_source_t *source);
 
+	/* First scene in scene-list order that contains this source, searched
+	 * recursively so a source inside a group still resolves. */
+	OBSSource FindContainingScene() const;
+
+	void SwitchToContainingScene();
+
+protected:
+	bool eventFilter(QObject *watched, QEvent *event) override;
+
 private slots:
 	void OpenProperties();
 	void OpenInteract();

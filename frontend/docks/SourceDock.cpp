@@ -25,6 +25,7 @@
 #include <widgets/OBSQTDisplay.hpp>
 
 #include <QHBoxLayout>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -48,6 +49,12 @@ SourceDock::SourceDock(OBSSource source, QWidget *parent) : OBSDock(parent)
 	};
 
 	connect(preview.data(), &OBSQTDisplay::DisplayCreated, this, addDrawCallback);
+
+	/* Clicking the preview switches to the scene this source belongs to,
+	 * which is the switcher behaviour the docks are useful for. */
+	preview->setCursor(Qt::PointingHandCursor);
+	preview->setToolTip(QTStr("Basic.SourceDock.ClickToSwitch"));
+	preview->installEventFilter(this);
 
 	propertiesButton = new QPushButton(QTStr("Properties"), this);
 	interactButton = new QPushButton(QTStr("Interact"), this);
@@ -161,6 +168,69 @@ void SourceDock::SourceRemoved(void *param, calldata_t *)
 void SourceDock::HandleRename(const QString &name)
 {
 	setWindowTitle(name);
+}
+
+OBSSource SourceDock::FindContainingScene() const
+{
+	OBSSource source = GetSource();
+
+	if (!source) {
+		return nullptr;
+	}
+
+	const char *name = obs_source_get_name(source);
+
+	if (!name || !*name) {
+		return nullptr;
+	}
+
+	struct SearchData {
+		const char *name;
+		OBSSource result;
+	};
+
+	SearchData data = {name, nullptr};
+
+	auto check = [](void *param, obs_source_t *sceneSource) {
+		SearchData *search = static_cast<SearchData *>(param);
+		obs_scene_t *scene = obs_scene_from_source(sceneSource);
+
+		if (scene && obs_scene_find_source_recursive(scene, search->name)) {
+			search->result = sceneSource;
+			return false;
+		}
+
+		return true;
+	};
+
+	obs_enum_scenes(check, &data);
+
+	return data.result;
+}
+
+void SourceDock::SwitchToContainingScene()
+{
+	OBSSource scene = FindContainingScene();
+
+	if (scene) {
+		/* In studio mode this lands on preview rather than program,
+		 * matching what clicking the scene list does. */
+		OBSBasic::Get()->SetCurrentScene(scene, false);
+	}
+}
+
+bool SourceDock::eventFilter(QObject *watched, QEvent *event)
+{
+	if (watched == preview && event->type() == QEvent::MouseButtonPress) {
+		QMouseEvent *mouse = static_cast<QMouseEvent *>(event);
+
+		if (mouse->button() == Qt::LeftButton) {
+			SwitchToContainingScene();
+			return true;
+		}
+	}
+
+	return OBSDock::eventFilter(watched, event);
 }
 
 void SourceDock::OpenProperties()
