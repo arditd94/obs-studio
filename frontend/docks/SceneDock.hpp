@@ -25,53 +25,37 @@
 
 #include <vector>
 
-class MediaControls;
 class OBSQTDisplay;
-class QPushButton;
 
-/* A dock showing a single source: a live preview, media transport when the
- * source supports it, and shortcuts to its properties and interaction window.
+/* A dock showing the live preview of one scene. Clicking the preview takes the
+ * scene to air, which turns a row of these into a switcher.
  *
- * Unlike a floating utility window, this is a real QDockWidget, so it can be
- * docked alongside the built-in panels and its position is saved with the rest
- * of the window state. */
-class SourceDock : public OBSDock {
+ * Being a real QDockWidget, it can be docked alongside the built-in panels and
+ * its placement is saved with the rest of the window state. */
+class SceneDock : public OBSDock {
 	Q_OBJECT
 
-	OBSWeakSource weakSource;
+	OBSWeakSource weakScene;
 
 	QPointer<OBSQTDisplay> preview;
-	QPointer<MediaControls> mediaControls;
-	QPointer<QPushButton> propertiesButton;
-	QPointer<QPushButton> interactButton;
 
 	std::vector<OBSSignal> sigs;
 
 	static void DrawPreview(void *data, uint32_t cx, uint32_t cy);
-	static void SourceRenamed(void *param, calldata_t *data);
-	static void SourceRemoved(void *param, calldata_t *data);
+	static void SceneRenamed(void *param, calldata_t *data);
+	static void SceneRemoved(void *param, calldata_t *data);
 
-	void UpdateButtons(obs_source_t *source);
-
-	/* First scene in scene-list order that contains this source, searched
-	 * recursively so a source inside a group still resolves. */
-	OBSSource FindContainingScene() const;
-
-	void SwitchToContainingScene();
+private slots:
+	void HandleRename(const QString &name);
 
 protected:
 	bool eventFilter(QObject *watched, QEvent *event) override;
 
-private slots:
-	void OpenProperties();
-	void OpenInteract();
-	void HandleRename(const QString &name);
-
 public:
-	SourceDock(OBSSource source, QWidget *parent = nullptr);
-	~SourceDock();
+	SceneDock(OBSSource scene, QWidget *parent = nullptr);
+	~SceneDock();
 
-	/* Empty once the source is gone, which is how the owner knows the dock
+	/* Empty once the scene is gone, which is how the owner knows the dock
 	 * should be dropped. */
-	OBSSource GetSource() const;
+	OBSSource GetScene() const;
 };

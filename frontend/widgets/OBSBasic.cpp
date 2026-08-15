@@ -1237,13 +1237,13 @@ void OBSBasic::OBSInit()
 	}
 #endif
 
-	/* Source docks are listed in a submenu that is rebuilt on demand, so the
-	 * available sources are never stale. */
-	sourceDocksMenu = new QMenu(QTStr("Basic.MainMenu.Docks.SourceDocks"), this);
-	ui->menuDocks->insertMenu(ui->scenesDock->toggleViewAction(), sourceDocksMenu);
-	connect(sourceDocksMenu, &QMenu::aboutToShow, this, &OBSBasic::UpdateSourceDocksMenu);
+	/* Scene docks are listed in a submenu that is rebuilt on demand, so the
+	 * available scenes are never stale. */
+	sceneDocksMenu = new QMenu(QTStr("Basic.MainMenu.Docks.SceneDocks"), this);
+	ui->menuDocks->insertMenu(ui->scenesDock->toggleViewAction(), sceneDocksMenu);
+	connect(sceneDocksMenu, &QMenu::aboutToShow, this, &OBSBasic::UpdateSceneDocksMenu);
 
-	LoadSourceDocks();
+	LoadSceneDocks();
 
 #ifdef YOUTUBE_ENABLED
 	/* setup YouTube app dock */
@@ -1908,7 +1908,7 @@ void OBSBasic::saveAll()
 		}
 #endif
 
-		SaveSourceDocks();
+		SaveSceneDocks();
 	});
 
 	config_set_int(App()->GetAppConfig(), "General", "LastVersion", LIBOBS_API_VER);

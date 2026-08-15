@@ -20,7 +20,7 @@
 #include "OBSBasic.hpp"
 
 #include <OBSApp.hpp>
-#include <docks/SourceDock.hpp>
+#include <docks/SceneDock.hpp>
 #include <json11.hpp>
 #include <qt-wrappers.hpp>
 
@@ -267,22 +267,22 @@ void OBSBasic::RepairCustomExtraDockName()
 }
 
 /* ------------------------------------------------------------------------- */
-/* Source docks */
+/* Scene docks */
 
-SourceDock *OBSBasic::FindSourceDock(const char *uuid)
+SceneDock *OBSBasic::FindSceneDock(const char *uuid)
 {
 	if (!uuid || !*uuid) {
 		return nullptr;
 	}
 
-	for (const QPointer<SourceDock> &dock : sourceDocks) {
+	for (const QPointer<SceneDock> &dock : sceneDocks) {
 		if (!dock) {
 			continue;
 		}
 
-		OBSSource source = dock->GetSource();
+		OBSSource scene = dock->GetScene();
 
-		if (source && strcmp(obs_source_get_uuid(source), uuid) == 0) {
+		if (scene && strcmp(obs_source_get_uuid(scene), uuid) == 0) {
 			return dock;
 		}
 	}
@@ -290,91 +290,91 @@ SourceDock *OBSBasic::FindSourceDock(const char *uuid)
 	return nullptr;
 }
 
-void OBSBasic::AddSourceDock(OBSSource source, bool firstCreate)
+void OBSBasic::AddSceneDock(OBSSource scene, bool firstCreate)
 {
-	if (!source) {
+	if (!scene) {
 		return;
 	}
 
-	SourceDock *dock = new SourceDock(source, this);
+	SceneDock *dock = new SceneDock(scene, this);
 
 	AddDockWidget(dock, Qt::RightDockWidgetArea);
-	sourceDocks.push_back(dock);
+	sceneDocks.push_back(dock);
 
 	/* A dock created on demand starts floating so it appears where the user
 	 * is looking; restored ones let saveState() place them. */
 	if (firstCreate) {
 		dock->setFloating(true);
-		dock->resize(400, 300);
+		dock->resize(360, 240);
 		dock->show();
-		SaveSourceDocks();
+		SaveSceneDocks();
 	}
 }
 
-void OBSBasic::RemoveSourceDock(const QString &uuid)
+void OBSBasic::RemoveSceneDock(const QString &uuid)
 {
-	for (int i = sourceDocks.size() - 1; i >= 0; i--) {
-		SourceDock *dock = sourceDocks[i];
+	for (int i = sceneDocks.size() - 1; i >= 0; i--) {
+		SceneDock *dock = sceneDocks[i];
 
 		if (!dock) {
-			sourceDocks.removeAt(i);
+			sceneDocks.removeAt(i);
 			continue;
 		}
 
-		OBSSource source = dock->GetSource();
+		OBSSource scene = dock->GetScene();
 
-		if (source && QString::fromUtf8(obs_source_get_uuid(source)) != uuid) {
+		if (scene && QString::fromUtf8(obs_source_get_uuid(scene)) != uuid) {
 			continue;
 		}
 
 		const QString name = dock->objectName();
-		sourceDocks.removeAt(i);
+		sceneDocks.removeAt(i);
 		RemoveDockWidget(name);
 	}
 
-	SaveSourceDocks();
+	SaveSceneDocks();
 }
 
-void OBSBasic::ToggleSourceDock(const QString &uuid)
+void OBSBasic::ToggleSceneDock(const QString &uuid)
 {
-	if (FindSourceDock(QT_TO_UTF8(uuid))) {
-		RemoveSourceDock(uuid);
+	if (FindSceneDock(QT_TO_UTF8(uuid))) {
+		RemoveSceneDock(uuid);
 		return;
 	}
 
-	OBSSourceAutoRelease source = obs_get_source_by_uuid(QT_TO_UTF8(uuid));
+	OBSSourceAutoRelease scene = obs_get_source_by_uuid(QT_TO_UTF8(uuid));
 
-	if (source) {
-		AddSourceDock(source.Get(), true);
+	if (scene) {
+		AddSceneDock(scene.Get(), true);
 	}
 }
 
-void OBSBasic::UpdateSourceDocksMenu()
+void OBSBasic::UpdateSceneDocksMenu()
 {
-	if (!sourceDocksMenu) {
+	if (!sceneDocksMenu) {
 		return;
 	}
 
-	/* Rebuilt every time the menu opens so it always reflects the sources
-	 * that exist now rather than a snapshot from startup. */
-	sourceDocksMenu->clear();
+	/* Rebuilt every time the menu opens so it always reflects the scenes that
+	 * exist now rather than a snapshot from startup. */
+	sceneDocksMenu->clear();
 
 	struct EnumData {
 		OBSBasic *window;
 		QMenu *menu;
 	};
 
-	EnumData data = {this, sourceDocksMenu};
+	EnumData data = {this, sceneDocksMenu};
 
-	auto addSource = [](void *param, obs_source_t *source) {
+	auto addScene = [](void *param, obs_source_t *scene) {
 		EnumData *enumData = static_cast<EnumData *>(param);
 
-		if (obs_source_removed(source)) {
+		if (obs_source_removed(scene)) {
 			return true;
 		}
 
-		const char *name = obs_source_get_name(source);
-		const char *uuid = obs_source_get_uuid(source);
+		const char *name = obs_source_get_name(scene);
+		const char *uuid = obs_source_get_uuid(scene);
 
 		if (!name || !uuid) {
 			return true;
@@ -382,26 +382,22 @@ void OBSBasic::UpdateSourceDocksMenu()
 
 		QAction *action = enumData->menu->addAction(QString::fromUtf8(name));
 		action->setCheckable(true);
-		action->setChecked(enumData->window->FindSourceDock(uuid) != nullptr);
+		action->setChecked(enumData->window->FindSceneDock(uuid) != nullptr);
 
 		OBSBasic *window = enumData->window;
 		const QString id = QString::fromUtf8(uuid);
 
-		QObject::connect(action, &QAction::triggered, window, [window, id]() { window->ToggleSourceDock(id); });
+		QObject::connect(action, &QAction::triggered, window, [window, id]() { window->ToggleSceneDock(id); });
 
 		return true;
 	};
 
-	obs_enum_sources(addSource, &data);
-
-	if (sourceDocksMenu->isEmpty()) {
-		sourceDocksMenu->addAction(QTStr("Basic.Main.Sources"))->setEnabled(false);
-	}
+	obs_enum_scenes(addScene, &data);
 }
 
-void OBSBasic::LoadSourceDocks()
+void OBSBasic::LoadSceneDocks()
 {
-	const char *jsonStr = config_get_string(App()->GetUserConfig(), "BasicWindow", "SourceDocks");
+	const char *jsonStr = config_get_string(App()->GetUserConfig(), "BasicWindow", "SceneDocks");
 
 	if (!jsonStr || !*jsonStr) {
 		return;
@@ -416,31 +412,31 @@ void OBSBasic::LoadSourceDocks()
 
 	for (const Json &item : json.array_items()) {
 		const std::string uuid = item["uuid"].string_value();
-		OBSSourceAutoRelease source = obs_get_source_by_uuid(uuid.c_str());
+		OBSSourceAutoRelease scene = obs_get_source_by_uuid(uuid.c_str());
 
-		if (source) {
-			AddSourceDock(source.Get(), false);
+		if (scene) {
+			AddSceneDock(scene.Get(), false);
 		}
 	}
 }
 
-void OBSBasic::SaveSourceDocks()
+void OBSBasic::SaveSceneDocks()
 {
 	Json::array array;
 
-	for (const QPointer<SourceDock> &dock : sourceDocks) {
+	for (const QPointer<SceneDock> &dock : sceneDocks) {
 		if (!dock) {
 			continue;
 		}
 
-		OBSSource source = dock->GetSource();
+		OBSSource scene = dock->GetScene();
 
-		if (!source) {
+		if (!scene) {
 			continue;
 		}
 
-		array.push_back(Json::object{{"uuid", obs_source_get_uuid(source)}});
+		array.push_back(Json::object{{"uuid", obs_source_get_uuid(scene)}});
 	}
 
-	config_set_string(App()->GetUserConfig(), "BasicWindow", "SourceDocks", Json(array).dump().c_str());
+	config_set_string(App()->GetUserConfig(), "BasicWindow", "SceneDocks", Json(array).dump().c_str());
 }
