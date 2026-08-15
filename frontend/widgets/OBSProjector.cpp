@@ -210,6 +210,66 @@ void OBSProjector::OBSRender(void *data, uint32_t cx, uint32_t cy)
 	}
 
 	endRegion();
+
+	const float alpha = window->FadeAlpha();
+
+	if (alpha > 0.0f) {
+		DrawFadeOverlay(cx, cy, alpha);
+	}
+}
+
+void OBSProjector::StartFade(bool in, uint32_t durationMs)
+{
+	fadeIn = in;
+	fadeDuration = (uint64_t)durationMs * 1000000ULL;
+	fadeStart = os_gettime_ns();
+}
+
+float OBSProjector::FadeAlpha() const
+{
+	if (fadeDuration == 0) {
+		return 0.0f;
+	}
+
+	const uint64_t now = os_gettime_ns();
+	const uint64_t elapsed = now > fadeStart ? now - fadeStart : 0;
+
+	if (elapsed >= fadeDuration) {
+		/* A finished fade-in is fully transparent; a finished fade-out
+		 * stays black so the screen holds until it is closed. */
+		return fadeIn ? 0.0f : 1.0f;
+	}
+
+	const float progress = (float)elapsed / (float)fadeDuration;
+
+	return fadeIn ? 1.0f - progress : progress;
+}
+
+void OBSProjector::DrawFadeOverlay(uint32_t cx, uint32_t cy, float alpha)
+{
+	gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
+	gs_technique_t *tech = gs_effect_get_technique(solid, "Solid");
+
+	vec4 color;
+	vec4_set(&color, 0.0f, 0.0f, 0.0f, alpha);
+	gs_effect_set_vec4(gs_effect_get_param_by_name(solid, "color"), &color);
+
+	gs_blend_state_push();
+	gs_blend_function(GS_BLEND_SRCALPHA, GS_BLEND_INVSRCALPHA);
+
+	gs_technique_begin(tech);
+	gs_technique_begin_pass(tech, 0);
+
+	gs_matrix_push();
+	gs_matrix_identity();
+	gs_matrix_scale3f(float(cx), float(cy), 1.0f);
+	gs_draw_sprite(nullptr, 0, 1, 1);
+	gs_matrix_pop();
+
+	gs_technique_end_pass(tech);
+	gs_technique_end(tech);
+
+	gs_blend_state_pop();
 }
 
 void OBSProjector::OBSSourceRenamed(void *data, calldata_t *params)

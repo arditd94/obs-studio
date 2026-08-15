@@ -43,6 +43,17 @@ private:
 	QRect prevGeometry;
 	void SetMonitor(int monitor);
 
+	/* Fade overlay state, used when a projector is opened or closed through
+	 * the Project button so the external screen does not cut to black. */
+	uint64_t fadeStart = 0;
+	uint64_t fadeDuration = 0;
+	bool fadeIn = true;
+
+	/* Alpha of the black overlay for the current frame, 0 when not fading. */
+	float FadeAlpha() const;
+
+	static void DrawFadeOverlay(uint32_t cx, uint32_t cy, float alpha);
+
 private slots:
 	void EscapeTriggered();
 	void OpenFullScreenProjector();
@@ -61,6 +72,10 @@ public:
 	int GetMonitor();
 	static void UpdateMultiviewProjectors();
 	void SetHideCursor();
+
+	/* Fades the projector contents from or to black. A fade-out does not
+	 * close the projector; the caller decides when to delete it. */
+	void StartFade(bool in, uint32_t durationMs);
 
 	bool IsAlwaysOnTop() const;
 	bool IsAlwaysOnTopOverridden() const;

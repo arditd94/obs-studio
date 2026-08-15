@@ -958,6 +958,11 @@ public slots:
 	 */
 private:
 	std::vector<OBSProjector *> projectors;
+
+	/* Projector driven by the Project button, kept apart from the ad-hoc
+	 * ones so toggling the button never closes a projector the user opened
+	 * by hand. */
+	QPointer<OBSProjector> projectOutput;
 	QPointer<QMenu> previewProjector;
 	QPointer<QMenu> previewProjectorSource;
 	QPointer<QMenu> previewProjectorMain;
@@ -981,6 +986,11 @@ private slots:
 	void OpenSourceWindow();
 	void OpenSceneWindow();
 	void openMultiviewWindow();
+
+private slots:
+	/* Auto-connected by name, so these have to be declared as slots. */
+	void on_projectButton_toggled(bool checked);
+	void on_projectSettingsButton_clicked();
 
 public:
 	void DeleteProjector(OBSProjector *projector);

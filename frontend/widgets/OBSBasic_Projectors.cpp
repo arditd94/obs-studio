@@ -20,6 +20,13 @@
 #include "OBSBasic.hpp"
 #include "OBSProjector.hpp"
 
+#include <OBSApp.hpp>
+#include <qt-wrappers.hpp>
+
+#include <QMenu>
+#include <QScreen>
+#include <QTimer>
+
 obs_data_array_t *OBSBasic::SaveProjectors()
 {
 	obs_data_array_t *savedProjectors = obs_data_array_create();
@@ -277,4 +284,104 @@ void OBSBasic::OpenSavedProjector(SavedProjectorInfo *info)
 void OBSBasic::openMultiviewWindow()
 {
 	OpenProjector(nullptr, -1, ProjectorType::Multiview);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Project button */
+
+void OBSBasic::on_projectButton_toggled(bool checked)
+{
+	const int monitor = (int)config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectMonitor");
+	const uint32_t fadeMs = (uint32_t)config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration");
+
+	if (checked) {
+		if (projectOutput) {
+			return;
+		}
+
+		/* Preview without a source renders the main texture, so the
+		 * screen follows the program output through transitions rather
+		 * than being pinned to one scene. */
+		OBSProjector *projector = OpenProjector(nullptr, monitor, ProjectorType::Preview);
+
+		if (!projector) {
+			QSignalBlocker block(ui->projectButton);
+			ui->projectButton->setChecked(false);
+			OBSMessageBox::warning(this, QTStr("Basic.Project"), QTStr("Basic.Project.NoMonitor"));
+			return;
+		}
+
+		projector->StartFade(true, fadeMs);
+		projectOutput = projector;
+		return;
+	}
+
+	if (!projectOutput) {
+		return;
+	}
+
+	OBSProjector *projector = projectOutput;
+	projectOutput = nullptr;
+
+	if (fadeMs == 0) {
+		DeleteProjector(projector);
+		return;
+	}
+
+	/* Hold the window open until the fade to black has finished, otherwise
+	 * closing it would be the very cut the fade exists to avoid. */
+	projector->StartFade(false, fadeMs);
+
+	QTimer::singleShot((int)fadeMs, this, [this, projector]() {
+		for (OBSProjector *existing : projectors) {
+			if (existing == projector) {
+				DeleteProjector(projector);
+				break;
+			}
+		}
+	});
+}
+
+void OBSBasic::on_projectSettingsButton_clicked()
+{
+	QMenu menu(this);
+
+	const int currentMonitor = (int)config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectMonitor");
+	const int currentFade = (int)config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration");
+
+	QMenu *monitorMenu = menu.addMenu(QTStr("Basic.Project.Monitor"));
+	QList<QScreen *> screens = QGuiApplication::screens();
+
+	for (int i = 0; i < screens.size(); i++) {
+		QScreen *screen = screens[i];
+		const QRect geometry = screen->geometry();
+
+		QString name = QString("%1: %2x%3 @ %4,%5")
+				       .arg(QString::number(i + 1), QString::number(geometry.width()),
+					    QString::number(geometry.height()), QString::number(geometry.x()),
+					    QString::number(geometry.y()));
+
+		QAction *action = monitorMenu->addAction(name);
+		action->setCheckable(true);
+		action->setChecked(i == currentMonitor);
+
+		connect(action, &QAction::triggered, this, [i]() {
+			config_set_int(App()->GetUserConfig(), "BasicWindow", "ProjectMonitor", i);
+		});
+	}
+
+	QMenu *fadeMenu = menu.addMenu(QTStr("Basic.Project.Fade"));
+
+	for (int ms : {0, 250, 500, 1000, 2000}) {
+		QAction *action = fadeMenu->addAction(ms == 0 ? QTStr("Basic.Project.Fade.None")
+							      : QTStr("Basic.Project.Fade.Ms").arg(QString::number(ms)));
+		action->setCheckable(true);
+		action->setChecked(ms == currentFade);
+
+		connect(action, &QAction::triggered, this, [ms]() {
+			config_set_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration", ms);
+		});
+	}
+
+	menu.exec(QCursor::pos());
 }
