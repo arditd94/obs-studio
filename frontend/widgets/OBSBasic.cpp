@@ -1237,6 +1237,14 @@ void OBSBasic::OBSInit()
 	}
 #endif
 
+	/* Source docks are listed in a submenu that is rebuilt on demand, so the
+	 * available sources are never stale. */
+	sourceDocksMenu = new QMenu(QTStr("Basic.MainMenu.Docks.SourceDocks"), this);
+	ui->menuDocks->insertMenu(ui->scenesDock->toggleViewAction(), sourceDocksMenu);
+	connect(sourceDocksMenu, &QMenu::aboutToShow, this, &OBSBasic::UpdateSourceDocksMenu);
+
+	LoadSourceDocks();
+
 #ifdef YOUTUBE_ENABLED
 	/* setup YouTube app dock */
 	if (YouTubeAppDock::IsYTServiceSelected()) {
@@ -1899,6 +1907,8 @@ void OBSBasic::saveAll()
 			SaveExtraBrowserDocks();
 		}
 #endif
+
+		SaveSourceDocks();
 	});
 
 	config_set_int(App()->GetAppConfig(), "General", "LastVersion", LIBOBS_API_VER);

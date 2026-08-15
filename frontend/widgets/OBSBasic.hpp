@@ -52,6 +52,7 @@ class OBSBasicAdvAudio;
 class OBSBasicFilters;
 class OBSBasicInteraction;
 class OBSBasicLayouts;
+class SourceDock;
 class OBSBasicProperties;
 class OBSBasicSourceSelect;
 class OBSBasicTransform;
@@ -449,6 +450,17 @@ private:
 
 	QStringList extraCustomDockNames;
 	QList<QPointer<QDockWidget>> extraCustomDocks;
+
+	QPointer<QMenu> sourceDocksMenu;
+	QList<QPointer<SourceDock>> sourceDocks;
+
+	SourceDock *FindSourceDock(const char *uuid);
+	void AddSourceDock(OBSSource source, bool firstCreate);
+	void RemoveSourceDock(const QString &uuid);
+	void ToggleSourceDock(const QString &uuid);
+	void UpdateSourceDocksMenu();
+	void LoadSourceDocks();
+	void SaveSourceDocks();
 
 	QPointer<OBSDock> controlsDock;
 	QPointer<OBSDock> mixerDock;
@@ -1234,8 +1246,14 @@ private slots:
 	void on_toggleSourceIcons_toggled(bool visible);
 
 	void OpenFilters(OBSSource source = nullptr);
+
+	/* Public so source docks can reach the same windows the source context
+	 * menu opens. */
+public slots:
 	void OpenProperties(OBSSource source = nullptr);
 	void OpenInteraction(OBSSource source = nullptr);
+
+private slots:
 	void OpenEditTransform(OBSSceneItem item = nullptr);
 
 public:
