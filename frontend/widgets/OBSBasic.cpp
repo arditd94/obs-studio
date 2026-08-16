@@ -39,6 +39,7 @@
 #include <dialogs/OBSBasicTransform.hpp>
 #include <models/SceneCollection.hpp>
 #include <settings/OBSBasicSettings.hpp>
+#include <utility/OverlayManager.hpp>
 #include <utility/QuickTransition.hpp>
 #include <utility/SceneRenameDelegate.hpp>
 #if defined(_WIN32) || defined(WHATSNEW_ENABLED)
@@ -1244,6 +1245,14 @@ void OBSBasic::OBSInit()
 	connect(sceneDocksMenu, &QMenu::aboutToShow, this, &OBSBasic::UpdateSceneDocksMenu);
 
 	LoadSceneDocks();
+	overlayManager = new OverlayManager(this);
+	overlayManager->RegisterHotkeys();
+	connect(overlayManager, &OverlayManager::overlayChanged, this, &OBSBasic::OverlayStateChanged);
+
+	for (int i = 0; i < overlayManager->Count(); i++) {
+		OverlayStateChanged(i);
+	}
+
 	LoadProjections();
 
 	if (config_get_bool(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteEnabled")) {

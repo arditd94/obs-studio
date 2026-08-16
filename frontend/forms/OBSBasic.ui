@@ -668,6 +668,110 @@
            </widget>
           </item>
           <item>
+           <widget class="QPushButton" name="overlayButton1">
+            <property name="minimumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>Basic.Overlay.Number1</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="overlayButton2">
+            <property name="minimumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>Basic.Overlay.Number2</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="overlayButton3">
+            <property name="minimumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>Basic.Overlay.Number3</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="overlayButton4">
+            <property name="minimumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>34</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="text">
+             <string>Basic.Overlay.Number4</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="overlayMenuButton">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="toolTip">
+             <string>Basic.Overlay.Manage</string>
+            </property>
+            <property name="text">
+             <string>Basic.Overlay</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QPushButton" name="projectButton">
             <property name="minimumSize">
              <size>

@@ -22,11 +22,13 @@
 
 #include <OBSApp.hpp>
 #include <dialogs/OBSBasicProjections.hpp>
+#include <utility/OverlayManager.hpp>
 #include <utility/ProjectionServer.hpp>
 #include <json11.hpp>
 #include <qt-wrappers.hpp>
 
 #include <QMenu>
+#include <QPushButton>
 #include <QScreen>
 #include <QTimer>
 
@@ -682,4 +684,65 @@ bool OBSBasic::IsProjectionServerRunning() const
 QStringList OBSBasic::ProjectionServerAddresses() const
 {
 	return ProjectionServer::LocalAddresses();
+}
+
+/* ------------------------------------------------------------------------- */
+/* Overlays */
+
+void OBSBasic::OverlayStateChanged(int index)
+{
+	QPushButton *buttons[] = {ui->overlayButton1, ui->overlayButton2, ui->overlayButton3, ui->overlayButton4};
+
+	if (index < 0 || index >= (int)(sizeof(buttons) / sizeof(buttons[0])) || !overlayManager) {
+		return;
+	}
+
+	QPushButton *button = buttons[index];
+	const QString name = overlayManager->DisplayName(index);
+
+	/* Set here rather than in the .ui: the translation pass runs over every
+	 * widget's text and blanks anything that is not a locale key. */
+	button->setText(QString::number(index + 1));
+
+	QSignalBlocker block(button);
+	button->setChecked(overlayManager->IsOn(index));
+
+	/* An empty layer cannot be raised, so its button says so instead of
+	 * looking available. */
+	button->setEnabled(!name.isEmpty());
+	button->setToolTip(name.isEmpty() ? QTStr("Basic.Overlay.Unassigned").arg(QString::number(index + 1))
+					  : QTStr("Basic.Overlay.Tooltip").arg(QString::number(index + 1), name));
+}
+
+void OBSBasic::on_overlayButton1_toggled(bool checked)
+{
+	if (overlayManager) {
+		overlayManager->SetOn(0, checked);
+	}
+}
+
+void OBSBasic::on_overlayButton2_toggled(bool checked)
+{
+	if (overlayManager) {
+		overlayManager->SetOn(1, checked);
+	}
+}
+
+void OBSBasic::on_overlayButton3_toggled(bool checked)
+{
+	if (overlayManager) {
+		overlayManager->SetOn(2, checked);
+	}
+}
+
+void OBSBasic::on_overlayButton4_toggled(bool checked)
+{
+	if (overlayManager) {
+		overlayManager->SetOn(3, checked);
+	}
+}
+
+void OBSBasic::on_overlayMenuButton_clicked()
+{
+	/* Panel still to come; the buttons already drive the layers. */
 }

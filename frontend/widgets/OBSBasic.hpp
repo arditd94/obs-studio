@@ -53,6 +53,7 @@ class OBSBasicFilters;
 class OBSBasicInteraction;
 class OBSBasicLayouts;
 class OBSBasicProjections;
+class OverlayManager;
 class ProjectionServer;
 class SceneDock;
 class OBSBasicProperties;
@@ -993,6 +994,10 @@ private:
 
 	QPointer<OBSBasicProjections> projectionsDialog;
 	QPointer<ProjectionServer> projectionServer;
+	/* A plain pointer rather than a guard: QPointer needs the complete type,
+	 * and pulling the manager's header into this one would push it through
+	 * most of the frontend. Ownership is Qt's, through the parent. */
+	OverlayManager *overlayManager = nullptr;
 	QPointer<QMenu> previewProjector;
 	QPointer<QMenu> previewProjectorSource;
 	QPointer<QMenu> previewProjectorMain;
@@ -1050,6 +1055,8 @@ public:
 
 	/* Remote control of the projection lines from another machine on the
 	 * local network. */
+	OverlayManager *GetOverlayManager() const { return overlayManager; }
+
 	bool StartProjectionServer(quint16 port, const QString &key);
 	void StopProjectionServer();
 	bool IsProjectionServerRunning() const;
@@ -1061,6 +1068,13 @@ signals:
 private:
 private slots:
 	/* Auto-connected by name, so these have to be declared as slots. */
+	void on_overlayButton1_toggled(bool checked);
+	void on_overlayButton2_toggled(bool checked);
+	void on_overlayButton3_toggled(bool checked);
+	void on_overlayButton4_toggled(bool checked);
+	void on_overlayMenuButton_clicked();
+	void OverlayStateChanged(int index);
+
 	void on_projectButton_toggled(bool checked);
 	void on_projectSettingsButton_clicked();
 	void ProjectionClosed(QObject *projector);

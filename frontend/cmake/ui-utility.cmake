@@ -28,6 +28,8 @@ target_sources(
     utility/MultitrackVideoOutput.cpp
     utility/MultitrackVideoOutput.hpp
     utility/NativeEventFilter.hpp
+    utility/OverlayManager.cpp
+    utility/OverlayManager.hpp
     utility/ProjectionServer.cpp
     utility/ProjectionServer.hpp
     utility/OBSCanvas.cpp

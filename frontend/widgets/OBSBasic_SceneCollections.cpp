@@ -17,6 +17,8 @@
 
 #include "OBSBasic.hpp"
 
+#include <utility/OverlayManager.hpp>
+
 #include <dialogs/OBSMissingFiles.hpp>
 #include <importer/OBSImporter.hpp>
 #include <models/SceneCollection.hpp>
@@ -880,6 +882,14 @@ void OBSBasic::Save(SceneCollection &collection)
 		obs_canvas_enum_scenes(canvas, exportSceneItemsCallback, &sourcesAndGroups);
 	}
 
+	if (overlayManager) {
+		OBSDataAutoRelease overlays = overlayManager->Save();
+		OBSDataArrayAutoRelease overlayHotkeys = overlayManager->SaveHotkeys();
+
+		obs_data_set_array(overlays, "hotkeys", overlayHotkeys);
+		obs_data_set_obj(saveData, "overlays", overlays);
+	}
+
 	obs_data_set_array(saveData, "sources", sourcesArray);
 	obs_data_set_array(saveData, "groups", groupsArray);
 
@@ -1413,6 +1423,18 @@ retryScene:
 	}
 
 	/* ------------------- */
+
+	/* Loaded after the sources so every layer can resolve the source it
+	 * points at, and outside the projector branch so it happens whether or
+	 * not projectors were saved. */
+	if (overlayManager) {
+		OBSDataAutoRelease overlays = obs_data_get_obj(data, "overlays");
+
+		overlayManager->Load(overlays);
+
+		OBSDataArrayAutoRelease overlayHotkeys = obs_data_get_array(overlays, "hotkeys");
+		overlayManager->LoadHotkeys(overlayHotkeys);
+	}
 
 	config_set_string(App()->GetUserConfig(), "Basic", "SceneCollection", collection.getName().c_str());
 	config_set_string(App()->GetUserConfig(), "Basic", "SceneCollectionFile", collection.getFileName().c_str());
