@@ -23,6 +23,7 @@ class OBSBasic;
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QLineEdit;
 class QPushButton;
 class QSpinBox;
 class QTableWidget;
@@ -41,6 +42,7 @@ class OBSBasicProjections : public QDialog {
 	QComboBox *fadeCombo = nullptr;
 	QCheckBox *remoteCheck = nullptr;
 	QSpinBox *portSpin = nullptr;
+	QLineEdit *keyEdit = nullptr;
 	QLabel *remoteLabel = nullptr;
 	QPushButton *removeButton = nullptr;
 	QLabel *warningLabel = nullptr;

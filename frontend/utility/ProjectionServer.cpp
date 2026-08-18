@@ -28,6 +28,11 @@
 #include <QTcpSocket>
 #include <QUrlQuery>
 
+#include <algorithm>
+
+/* The longest fade worth honouring; anything beyond it is a mistake. */
+static constexpr int kMaxFadeMs = 10000;
+
 ProjectionServer::ProjectionServer(OBSBasic *parent) : QObject(parent), main(parent) {}
 
 ProjectionServer::~ProjectionServer()
@@ -215,8 +220,13 @@ void ProjectionServer::HandleRequest(QTcpSocket *socket, const QString &request)
 	}
 
 	/* Everything past this point changes or reveals what is on the screens,
-	 * so it needs the key. */
-	if (query.queryItemValue("k") != key) {
+	 * so it needs the key.
+	 *
+	 * An empty key refuses everything rather than matching everything: a
+	 * missing query item reads back as an empty string, so comparing the two
+	 * would let a request with no key at all through, and the one setting
+	 * meant to lock the door would be the one that unlocks it. */
+	if (key.isEmpty() || query.queryItemValue("k") != key) {
 		Respond(socket, 403, "application/json", "{\"error\":\"key\"}");
 		return;
 	}
@@ -248,7 +258,12 @@ void ProjectionServer::HandleRequest(QTcpSocket *socket, const QString &request)
 	}
 
 	if (path == "/fade") {
-		main->SetProjectionFadeDuration(query.queryItemValue("ms").toInt());
+		/* Clamped because the value is stored and then read back unsigned:
+		 * a negative one becomes roughly fifty days, which leaves the
+		 * screen mid-fade and the projector never closing. */
+		const int ms = std::clamp(query.queryItemValue("ms").toInt(), 0, kMaxFadeMs);
+
+		main->SetProjectionFadeDuration(ms);
 		Respond(socket, 200, "application/json", StateJson());
 		return;
 	}

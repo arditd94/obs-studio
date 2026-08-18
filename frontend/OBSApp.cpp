@@ -37,6 +37,7 @@
 #include <qt-wrappers.hpp>
 
 #include <QCheckBox>
+#include <QRandomGenerator>
 #include <QDesktopServices>
 #if defined(_WIN32) || defined(ENABLE_SPARKLE_UPDATER)
 #include <QFile>
@@ -364,7 +365,20 @@ void OBSApp::InitUserConfigDefaults()
 
 	config_set_default_bool(userConfig, "BasicWindow", "ProjectionRemoteEnabled", false);
 	config_set_default_uint(userConfig, "BasicWindow", "ProjectionRemotePort", 4460);
-	config_set_default_string(userConfig, "BasicWindow", "ProjectionRemoteKey", "1408");
+	/* Drawn once per installation rather than shipped as a literal: a key
+	 * baked into the binary is known to everyone who has the binary, and it
+	 * is the only thing standing between the local network and the screens.
+	 * It is shown in the projections panel so it can be read off and typed
+	 * into the control room browser. */
+	if (!config_has_user_value(userConfig, "BasicWindow", "ProjectionRemoteKey")) {
+		QString generated;
+
+		for (int i = 0; i < 8; i++) {
+			generated.append(QChar(u'0' + QRandomGenerator::system()->bounded(10)));
+		}
+
+		config_set_string(userConfig, "BasicWindow", "ProjectionRemoteKey", QT_TO_UTF8(generated));
+	}
 	config_set_default_double(userConfig, "BasicWindow", "SnapDistance", 10.0);
 	config_set_default_bool(userConfig, "BasicWindow", "SpacingHelpersEnabled", true);
 	config_set_default_bool(userConfig, "BasicWindow", "RecordWhenStreaming", false);

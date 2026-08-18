@@ -29,6 +29,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSet>
 #include <QTableWidget>
@@ -130,9 +131,31 @@ void OBSBasicProjections::BuildUI()
 	remoteLabel->setWordWrap(true);
 	remoteLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
+	/* Shown rather than hidden: the key is drawn at random per installation,
+	 * so there is nothing to remember and it has to be readable here to be
+	 * typed into the control room browser. */
+	keyEdit = new QLineEdit(this);
+	keyEdit->setText(
+		QString::fromUtf8(config_get_string(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteKey")));
+	keyEdit->setMaxLength(64);
+	keyEdit->setFixedWidth(120);
+
+	connect(keyEdit, &QLineEdit::editingFinished, this, [this]() {
+		config_set_string(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteKey",
+				  QT_TO_UTF8(keyEdit->text()));
+
+		/* Rebind so the running server stops answering to the old key the
+		 * moment the new one is set. */
+		if (remoteCheck->isChecked()) {
+			OnRemoteToggled(true);
+		}
+	});
+
 	QHBoxLayout *remoteRow = new QHBoxLayout();
 	remoteRow->addWidget(remoteCheck);
 	remoteRow->addWidget(portSpin);
+	remoteRow->addWidget(new QLabel(QTStr("Basic.Projections.Remote.Key"), this));
+	remoteRow->addWidget(keyEdit);
 	remoteRow->addStretch();
 
 	warningLabel = new QLabel(this);
@@ -375,8 +398,9 @@ void OBSBasicProjections::OnRemoteToggled(bool on)
 		return;
 	}
 
-	const QString accessKey =
-		QString::fromUtf8(config_get_string(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteKey"));
+	const QString accessKey = keyEdit ? keyEdit->text()
+					  : QString::fromUtf8(config_get_string(App()->GetUserConfig(), "BasicWindow",
+										"ProjectionRemoteKey"));
 
 	if (!main->StartProjectionServer((quint16)portSpin->value(), accessKey)) {
 		QSignalBlocker block(remoteCheck);

@@ -33,6 +33,8 @@
 #include <QScreen>
 #include <QTimer>
 
+#include <algorithm>
+
 using namespace json11;
 
 obs_data_array_t *OBSBasic::SaveProjectors()
@@ -299,7 +301,12 @@ void OBSBasic::openMultiviewWindow()
 
 static uint32_t ProjectionFadeMs()
 {
-	return (uint32_t)config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration");
+	const int64_t stored = config_get_int(App()->GetUserConfig(), "BasicWindow", "ProjectFadeDuration");
+
+	/* Clamped on the way out rather than trusted: the value is read back
+	 * unsigned, so a negative one left in the file by hand would become
+	 * roughly fifty days and hold the screen mid-fade forever. */
+	return (uint32_t)std::clamp<int64_t>(stored, 0, 10000);
 }
 
 bool OBSBasic::IsProjectionShown(int index) const
