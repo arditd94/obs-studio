@@ -863,6 +863,11 @@ private:
 	float dpi = 1.0;
 
 	void DrawBackdrop(float cx, float cy);
+
+	/* Frames the preview in red while a recording is running, so the
+	 * state is legible from across the room rather than only from the
+	 * status bar. */
+	void DrawRecordingBorder();
 	void InitPrimitives();
 	void UpdatePreviewScalingMenu();
 

@@ -129,6 +129,63 @@ void OBSBasic::DrawBackdrop(float cx, float cy)
 	GS_DEBUG_MARKER_END();
 }
 
+/* Sits in the margin the preview already leaves around the canvas, so the frame
+ * appears without the picture moving or shrinking under it. */
+void OBSBasic::DrawRecordingBorder()
+{
+	if (!box) {
+		return;
+	}
+
+	GS_DEBUG_MARKER_BEGIN(GS_DEBUG_COLOR_DEFAULT, "DrawRecordingBorder");
+
+	const float thickness = float(PREVIEW_EDGE_SIZE) * 0.6f;
+	const float cx = float(previewCX);
+	const float cy = float(previewCY);
+
+	gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
+	gs_eparam_t *color = gs_effect_get_param_by_name(solid, "color");
+	gs_technique_t *tech = gs_effect_get_technique(solid, "Solid");
+
+	vec4 colorVal;
+	vec4_set(&colorVal, 1.0f, 0.0f, 0.0f, 1.0f);
+	gs_effect_set_vec4(color, &colorVal);
+
+	gs_technique_begin(tech);
+	gs_technique_begin_pass(tech, 0);
+
+	/* The two long sides run the full width and the short ones fill what is
+	 * left between them, so every corner is covered exactly once. */
+	const struct {
+		float x, y, cx, cy;
+	} sides[] = {
+		{-thickness, -thickness, cx + thickness * 2.0f, thickness},
+		{-thickness, cy, cx + thickness * 2.0f, thickness},
+		{-thickness, 0.0f, thickness, cy},
+		{cx, 0.0f, thickness, cy},
+	};
+
+	gs_load_vertexbuffer(box);
+
+	for (const auto &side : sides) {
+		gs_matrix_push();
+		gs_matrix_identity();
+		gs_matrix_translate3f(side.x, side.y, 0.0f);
+		gs_matrix_scale3f(side.cx, side.cy, 1.0f);
+
+		gs_draw(GS_TRISTRIP, 0, 0);
+
+		gs_matrix_pop();
+	}
+
+	gs_technique_end_pass(tech);
+	gs_technique_end(tech);
+
+	gs_load_vertexbuffer(nullptr);
+
+	GS_DEBUG_MARKER_END();
+}
+
 void OBSBasic::RenderMain(void *data, uint32_t, uint32_t)
 {
 	GS_DEBUG_MARKER_BEGIN(GS_DEBUG_COLOR_DEFAULT, "RenderMain");
@@ -190,6 +247,13 @@ void OBSBasic::RenderMain(void *data, uint32_t, uint32_t)
 	}
 
 	window->ui->preview->DrawSceneEditing();
+
+	/* recordingStarted is set from the RecordingStarted and RecordingStopped
+	 * signals, both raised before anything in those handlers can block, so
+	 * the frame follows the recording rather than the dialogs around it. */
+	if (window->recordingStarted) {
+		window->DrawRecordingBorder();
+	}
 
 	if (window->drawSpacingHelpers) {
 		window->ui->preview->DrawSpacingHelpers();
