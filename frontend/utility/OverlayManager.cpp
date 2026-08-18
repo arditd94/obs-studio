@@ -20,9 +20,29 @@
 #include <OBSApp.hpp>
 #include <qt-wrappers.hpp>
 
+obs_transform_info OverlayManager::DefaultTransform()
+{
+	obs_transform_info info = {};
+
+	vec2_set(&info.pos, 0.0f, 0.0f);
+	vec2_set(&info.scale, 1.0f, 1.0f);
+	vec2_set(&info.bounds, 0.0f, 0.0f);
+	info.rot = 0.0f;
+	info.alignment = OBS_ALIGN_TOP | OBS_ALIGN_LEFT;
+	info.bounds_type = OBS_BOUNDS_NONE;
+	info.bounds_alignment = OBS_ALIGN_CENTER;
+	info.crop_to_bounds = false;
+
+	return info;
+}
+
 OverlayManager::OverlayManager(QObject *parent) : QObject(parent)
 {
 	for (int i = 0; i < kOverlayCount; i++) {
+		const QString name = QString("obs_overlay_%1_scene").arg(i + 1);
+
+		layers[i].scene = obs_scene_create_private(QT_TO_UTF8(name));
+
 		RebuildTransition(i);
 	}
 }
@@ -43,8 +63,7 @@ void OverlayManager::RebuildTransition(int index)
 	const QString id = layer.config.transitionId.isEmpty() ? QString("fade_transition") : layer.config.transitionId;
 	const QString name = QString("obs_overlay_%1").arg(index + 1);
 
-	OBSSourceAutoRelease transition =
-		obs_source_create_private(QT_TO_UTF8(id), QT_TO_UTF8(name), nullptr);
+	OBSSourceAutoRelease transition = obs_source_create_private(QT_TO_UTF8(id), QT_TO_UTF8(name), nullptr);
 
 	if (!transition) {
 		return;
@@ -68,6 +87,44 @@ void OverlayManager::RebuildTransition(int index)
 	ApplyState(index, true);
 }
 
+void OverlayManager::RebuildItem(int index)
+{
+	Layer &layer = layers[index];
+
+	if (!layer.scene) {
+		return;
+	}
+
+	if (layer.item) {
+		obs_sceneitem_remove(layer.item);
+		layer.item = nullptr;
+	}
+
+	OBSSource source = GetSource(index);
+
+	if (!source) {
+		return;
+	}
+
+	layer.item = obs_scene_add(layer.scene, source);
+
+	ApplyTransform(index);
+}
+
+void OverlayManager::ApplyTransform(int index)
+{
+	Layer &layer = layers[index];
+
+	if (!layer.item) {
+		return;
+	}
+
+	obs_sceneitem_defer_update_begin(layer.item);
+	obs_sceneitem_set_info2(layer.item, &layer.config.transform);
+	obs_sceneitem_set_crop(layer.item, &layer.config.crop);
+	obs_sceneitem_defer_update_end(layer.item);
+}
+
 void OverlayManager::ApplyState(int index, bool immediate)
 {
 	Layer &layer = layers[index];
@@ -76,7 +133,9 @@ void OverlayManager::ApplyState(int index, bool immediate)
 		return;
 	}
 
-	OBSSource target = layer.on ? GetSource(index) : OBSSource();
+	/* The scene rather than the source: it is what carries the transform,
+	 * and it is only worth showing once something is in it. */
+	OBSSource target = (layer.on && layer.item) ? OBSSource(obs_scene_get_source(layer.scene)) : OBSSource();
 
 	/* Cut is a fade of no length rather than a separate path. */
 	const uint32_t duration = immediate ? 0 : layer.config.durationMs;
@@ -97,8 +156,18 @@ void OverlayManager::SetConfig(int index, const Config &config)
 {
 	Layer &layer = layers[index];
 	const bool transitionChanged = layer.config.transitionId != config.transitionId;
+	const bool sourceChanged = layer.config.sourceUuid != config.sourceUuid;
 
 	layer.config = config;
+
+	if (sourceChanged) {
+		RebuildItem(index);
+	} else {
+		/* Saving the same graphic from a new spot in the preview changes
+		 * only where it sits, which the item takes without being torn
+		 * down and put back. */
+		ApplyTransform(index);
+	}
 
 	if (transitionChanged) {
 		RebuildTransition(index);
@@ -124,6 +193,11 @@ OBSSource OverlayManager::GetSource(int index) const
 	return OBSSource(source.Get());
 }
 
+OBSSceneItem OverlayManager::GetItem(int index) const
+{
+	return layers[index].item;
+}
+
 bool OverlayManager::IsSourceMissing(int index) const
 {
 	return !layers[index].config.sourceUuid.isEmpty() && !GetSource(index);
@@ -140,7 +214,7 @@ void OverlayManager::SetOn(int index, bool on)
 
 	/* An empty layer has nothing to raise, so it stays down instead of
 	 * reporting a state the output cannot show. */
-	if (on && !GetSource(index)) {
+	if (on && !layer.item) {
 		return;
 	}
 
@@ -167,6 +241,12 @@ void OverlayManager::Clear(int index)
 	layer.config.sourceUuid.clear();
 	layer.config.name.clear();
 
+	/* The placement goes with the source rather than outliving it: an empty
+	 * layer should hand the next graphic a clean slate. */
+	layer.config.transform = DefaultTransform();
+	layer.config.crop = {};
+
+	RebuildItem(index);
 	ApplyState(index, false);
 
 	emit overlayChanged(index);
@@ -232,11 +312,12 @@ void OverlayManager::RegisterHotkeys()
 		const QString description = QTStr("Basic.Overlay.Hotkey").arg(QString::number(i + 1));
 
 		layers[i].toggleHotkey = obs_hotkey_register_frontend(QT_TO_UTF8(name), QT_TO_UTF8(description),
-								     OverlayManager::ToggleHotkeyPressed, this);
+								      OverlayManager::ToggleHotkeyPressed, this);
 	}
 
-	clearAllHotkey = obs_hotkey_register_frontend("OBSBasic.OverlayClearAll", QT_TO_UTF8(QTStr("Basic.Overlay.ClearAll")),
-						     OverlayManager::ClearAllHotkeyPressed, this);
+	clearAllHotkey = obs_hotkey_register_frontend("OBSBasic.OverlayClearAll",
+						      QT_TO_UTF8(QTStr("Basic.Overlay.ClearAll")),
+						      OverlayManager::ClearAllHotkeyPressed, this);
 }
 
 void OverlayManager::UnregisterHotkeys()
@@ -314,6 +395,60 @@ void OverlayManager::LoadHotkeys(obs_data_array_t *array)
 	}
 }
 
+namespace {
+
+void SaveTransform(obs_data_t *item, const obs_transform_info &info, const obs_sceneitem_crop &crop)
+{
+	OBSDataAutoRelease data = obs_data_create();
+
+	obs_data_set_double(data, "pos_x", info.pos.x);
+	obs_data_set_double(data, "pos_y", info.pos.y);
+	obs_data_set_double(data, "rot", info.rot);
+	obs_data_set_double(data, "scale_x", info.scale.x);
+	obs_data_set_double(data, "scale_y", info.scale.y);
+	obs_data_set_int(data, "alignment", info.alignment);
+	obs_data_set_int(data, "bounds_type", info.bounds_type);
+	obs_data_set_int(data, "bounds_alignment", info.bounds_alignment);
+	obs_data_set_double(data, "bounds_x", info.bounds.x);
+	obs_data_set_double(data, "bounds_y", info.bounds.y);
+	obs_data_set_bool(data, "crop_to_bounds", info.crop_to_bounds);
+	obs_data_set_int(data, "crop_left", crop.left);
+	obs_data_set_int(data, "crop_top", crop.top);
+	obs_data_set_int(data, "crop_right", crop.right);
+	obs_data_set_int(data, "crop_bottom", crop.bottom);
+
+	obs_data_set_obj(item, "transform", data);
+}
+
+void LoadTransform(obs_data_t *item, obs_transform_info &info, obs_sceneitem_crop &crop)
+{
+	OBSDataAutoRelease data = obs_data_get_obj(item, "transform");
+
+	/* A layer saved before layers had a transform keeps the default rather
+	 * than collapsing to a zero scale. */
+	if (!data) {
+		return;
+	}
+
+	vec2_set(&info.pos, (float)obs_data_get_double(data, "pos_x"), (float)obs_data_get_double(data, "pos_y"));
+	vec2_set(&info.scale, (float)obs_data_get_double(data, "scale_x"), (float)obs_data_get_double(data, "scale_y"));
+	vec2_set(&info.bounds, (float)obs_data_get_double(data, "bounds_x"),
+		 (float)obs_data_get_double(data, "bounds_y"));
+
+	info.rot = (float)obs_data_get_double(data, "rot");
+	info.alignment = (uint32_t)obs_data_get_int(data, "alignment");
+	info.bounds_type = (enum obs_bounds_type)obs_data_get_int(data, "bounds_type");
+	info.bounds_alignment = (uint32_t)obs_data_get_int(data, "bounds_alignment");
+	info.crop_to_bounds = obs_data_get_bool(data, "crop_to_bounds");
+
+	crop.left = (int)obs_data_get_int(data, "crop_left");
+	crop.top = (int)obs_data_get_int(data, "crop_top");
+	crop.right = (int)obs_data_get_int(data, "crop_right");
+	crop.bottom = (int)obs_data_get_int(data, "crop_bottom");
+}
+
+} // namespace
+
 obs_data_t *OverlayManager::Save() const
 {
 	obs_data_t *data = obs_data_create();
@@ -328,6 +463,18 @@ obs_data_t *OverlayManager::Save() const
 		obs_data_set_string(item, "transition", QT_TO_UTF8(config.transitionId));
 		obs_data_set_int(item, "duration", config.durationMs);
 		obs_data_set_bool(item, "on", layers[i].on);
+
+		/* Read back off the item, since the Transform window edits that
+		 * directly and the config only catches up here. */
+		obs_transform_info info = config.transform;
+		obs_sceneitem_crop crop = config.crop;
+
+		if (layers[i].item) {
+			obs_sceneitem_get_info2(layers[i].item, &info);
+			obs_sceneitem_get_crop(layers[i].item, &crop);
+		}
+
+		SaveTransform(item, info, crop);
 
 		obs_data_array_push_back(array, item);
 	}
@@ -366,9 +513,13 @@ void OverlayManager::Load(obs_data_t *data)
 			layer.config.transitionId = "fade_transition";
 		}
 
+		LoadTransform(item, layer.config.transform, layer.config.crop);
+
+		RebuildItem((int)i);
+
 		/* A layer that was up is restored up, unless its source went
 		 * missing while OBS was closed. */
-		layer.on = obs_data_get_bool(item, "on") && GetSource((int)i) != nullptr;
+		layer.on = obs_data_get_bool(item, "on") && layer.item != nullptr;
 
 		RebuildTransition((int)i);
 
@@ -381,6 +532,15 @@ void OverlayManager::Reset()
 	for (int i = 0; i < kOverlayCount; i++) {
 		layers[i].on = false;
 		layers[i].config = Config();
+
+		/* The sources being dropped belong to the collection on its way
+		 * out, so the layer lets go of its own before they go. */
+		RebuildItem(i);
+
+		/* Changing scene collection empties every output channel, so the
+		 * transition is parked again rather than assumed to still sit
+		 * there. */
+		obs_set_output_source(kFirstChannel + i, layers[i].transition);
 
 		ApplyState(i, true);
 

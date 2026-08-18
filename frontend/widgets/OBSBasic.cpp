@@ -1117,6 +1117,13 @@ void OBSBasic::OBSInit()
 	}
 	UpdateEditMenu();
 
+	/* Built before the scene collection is read, since the collection carries
+	 * the layers' configuration and their hotkey bindings. */
+	overlayManager = new OverlayManager(this);
+	overlayManager->RegisterHotkeys();
+	connect(overlayManager, &OverlayManager::overlayChanged, this, &OBSBasic::OverlayStateChanged);
+	SetupOverlayButtons();
+
 	{
 		ProfileScope("OBSBasic::Load");
 		const std::string sceneCollectionName{
@@ -1245,9 +1252,6 @@ void OBSBasic::OBSInit()
 	connect(sceneDocksMenu, &QMenu::aboutToShow, this, &OBSBasic::UpdateSceneDocksMenu);
 
 	LoadSceneDocks();
-	overlayManager = new OverlayManager(this);
-	overlayManager->RegisterHotkeys();
-	connect(overlayManager, &OverlayManager::overlayChanged, this, &OBSBasic::OverlayStateChanged);
 
 	for (int i = 0; i < overlayManager->Count(); i++) {
 		OverlayStateChanged(i);
@@ -1256,10 +1260,10 @@ void OBSBasic::OBSInit()
 	LoadProjections();
 
 	if (config_get_bool(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteEnabled")) {
-		StartProjectionServer(
-			(quint16)config_get_uint(App()->GetUserConfig(), "BasicWindow", "ProjectionRemotePort"),
-			QString::fromUtf8(
-				config_get_string(App()->GetUserConfig(), "BasicWindow", "ProjectionRemoteKey")));
+		StartProjectionServer((quint16)config_get_uint(App()->GetUserConfig(), "BasicWindow",
+							       "ProjectionRemotePort"),
+				      QString::fromUtf8(config_get_string(App()->GetUserConfig(), "BasicWindow",
+									  "ProjectionRemoteKey")));
 	}
 
 #ifdef YOUTUBE_ENABLED

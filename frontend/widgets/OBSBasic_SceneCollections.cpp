@@ -1602,6 +1602,14 @@ void OBSBasic::ClearSceneData()
 
 	ClearProjectors();
 
+	/* Each layer holds its source inside a scene of its own, so those have
+	 * to be emptied here: a source still referenced when the enumeration
+	 * below runs is counted as an orphan, and orphans mean the collection
+	 * did not clear. */
+	if (overlayManager) {
+		overlayManager->Reset();
+	}
+
 	for (int i = 0; i < MAX_CHANNELS; i++) {
 		obs_set_output_source(i, nullptr);
 	}

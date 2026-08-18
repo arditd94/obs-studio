@@ -21,6 +21,7 @@
 #include "OBSProjector.hpp"
 
 #include <OBSApp.hpp>
+#include <dialogs/OBSBasicOverlays.hpp>
 #include <dialogs/OBSBasicProjections.hpp>
 #include <utility/OverlayManager.hpp>
 #include <utility/ProjectionServer.hpp>
@@ -689,15 +690,45 @@ QStringList OBSBasic::ProjectionServerAddresses() const
 /* ------------------------------------------------------------------------- */
 /* Overlays */
 
-void OBSBasic::OverlayStateChanged(int index)
+QPushButton *OBSBasic::OverlayButton(int index) const
 {
 	QPushButton *buttons[] = {ui->overlayButton1, ui->overlayButton2, ui->overlayButton3, ui->overlayButton4};
 
-	if (index < 0 || index >= (int)(sizeof(buttons) / sizeof(buttons[0])) || !overlayManager) {
+	if (index < 0 || index >= (int)(sizeof(buttons) / sizeof(buttons[0]))) {
+		return nullptr;
+	}
+
+	return buttons[index];
+}
+
+void OBSBasic::SetupOverlayButtons()
+{
+	for (int i = 0; i < overlayManager->Count(); i++) {
+		QPushButton *button = OverlayButton(i);
+
+		if (!button) {
+			continue;
+		}
+
+		/* A right click is how a layer is filled, so it has to reach an
+		 * empty preset too. That is why the buttons are never disabled:
+		 * a disabled widget is handed no context menu event, and an empty
+		 * preset is exactly the one being filled. */
+		button->setContextMenuPolicy(Qt::CustomContextMenu);
+
+		connect(button, &QWidget::customContextMenuRequested, this,
+			[this, i](const QPoint &pos) { OverlayButtonMenu(i, pos); });
+	}
+}
+
+void OBSBasic::OverlayStateChanged(int index)
+{
+	QPushButton *button = OverlayButton(index);
+
+	if (!button || !overlayManager) {
 		return;
 	}
 
-	QPushButton *button = buttons[index];
 	const QString name = overlayManager->DisplayName(index);
 
 	/* Set here rather than in the .ui: the translation pass runs over every
@@ -707,42 +738,130 @@ void OBSBasic::OverlayStateChanged(int index)
 	QSignalBlocker block(button);
 	button->setChecked(overlayManager->IsOn(index));
 
-	/* An empty layer cannot be raised, so its button says so instead of
-	 * looking available. */
-	button->setEnabled(!name.isEmpty());
+	/* An empty preset goes flat rather than disabled, since it still has to
+	 * take the right click that fills it. */
+	button->setFlat(name.isEmpty());
 	button->setToolTip(name.isEmpty() ? QTStr("Basic.Overlay.Unassigned").arg(QString::number(index + 1))
 					  : QTStr("Basic.Overlay.Tooltip").arg(QString::number(index + 1), name));
 }
 
+void OBSBasic::OverlayButtonMenu(int index, const QPoint &pos)
+{
+	QPushButton *button = OverlayButton(index);
+
+	if (!button || !overlayManager) {
+		return;
+	}
+
+	QMenu menu(this);
+
+	OBSSceneItem item = GetCurrentSceneItem();
+	OBSSource selected = item ? obs_sceneitem_get_source(item) : nullptr;
+
+	QAction *save = menu.addAction(
+		selected ? QTStr("Basic.Overlay.SaveFrom").arg(QString::fromUtf8(obs_source_get_name(selected)))
+			 : QTStr("Basic.Overlay.Save"));
+
+	save->setEnabled(selected != nullptr);
+	save->setToolTip(QTStr("Basic.Overlay.Save.Hint"));
+
+	connect(save, &QAction::triggered, this, [this, index]() { SaveOverlayFromSelection(index); });
+
+	QAction *clear = menu.addAction(QTStr("Basic.Overlay.Clear"));
+
+	clear->setEnabled(!overlayManager->DisplayName(index).isEmpty());
+
+	connect(clear, &QAction::triggered, this, [this, index]() { overlayManager->Clear(index); });
+
+	menu.addSeparator();
+
+	QAction *manage = menu.addAction(QTStr("Basic.Overlay.Manage"));
+
+	connect(manage, &QAction::triggered, this, &OBSBasic::on_overlayMenuButton_clicked);
+
+	menu.exec(button->mapToGlobal(pos));
+}
+
+void OBSBasic::SaveOverlayFromSelection(int index)
+{
+	OBSSceneItem item = GetCurrentSceneItem();
+
+	if (!item || !overlayManager) {
+		return;
+	}
+
+	OBSSource source = obs_sceneitem_get_source(item);
+
+	if (!source) {
+		return;
+	}
+
+	OverlayManager::Config config = overlayManager->GetConfig(index);
+
+	config.sourceUuid = QString::fromUtf8(obs_source_get_uuid(source));
+	config.name = QString::fromUtf8(obs_source_get_name(source));
+
+	/* Taken off the item as it stands in the preview, so the layer shows the
+	 * graphic exactly where it was just put rather than somewhere the layer
+	 * decides for itself. */
+	obs_sceneitem_get_info2(item, &config.transform);
+	obs_sceneitem_get_crop(item, &config.crop);
+
+	overlayManager->SetConfig(index, config);
+
+	/* Re-saving a layer that already held this graphic changes nothing on
+	 * the button, so the confirmation has to be said out loud. */
+	ui->statusbar->showMessage(QTStr("Basic.Overlay.Saved").arg(config.name, QString::number(index + 1)), 4000);
+}
+
+void OBSBasic::OverlayToggled(int index, bool checked)
+{
+	if (!overlayManager) {
+		return;
+	}
+
+	overlayManager->SetOn(index, checked);
+
+	/* An empty preset refuses to come up, and says nothing when it does, so
+	 * the button is put back rather than left latched over a layer that is
+	 * not there. */
+	OverlayStateChanged(index);
+}
+
 void OBSBasic::on_overlayButton1_toggled(bool checked)
 {
-	if (overlayManager) {
-		overlayManager->SetOn(0, checked);
-	}
+	OverlayToggled(0, checked);
 }
 
 void OBSBasic::on_overlayButton2_toggled(bool checked)
 {
-	if (overlayManager) {
-		overlayManager->SetOn(1, checked);
-	}
+	OverlayToggled(1, checked);
 }
 
 void OBSBasic::on_overlayButton3_toggled(bool checked)
 {
-	if (overlayManager) {
-		overlayManager->SetOn(2, checked);
-	}
+	OverlayToggled(2, checked);
 }
 
 void OBSBasic::on_overlayButton4_toggled(bool checked)
 {
-	if (overlayManager) {
-		overlayManager->SetOn(3, checked);
-	}
+	OverlayToggled(3, checked);
 }
 
 void OBSBasic::on_overlayMenuButton_clicked()
 {
-	/* Panel still to come; the buttons already drive the layers. */
+	if (!overlayManager) {
+		return;
+	}
+
+	if (overlaysDialog) {
+		overlaysDialog->show();
+		overlaysDialog->raise();
+		overlaysDialog->activateWindow();
+		return;
+	}
+
+	overlaysDialog = new OBSBasicOverlays(this);
+	overlaysDialog->setAttribute(Qt::WA_DeleteOnClose, true);
+	overlaysDialog->show();
 }

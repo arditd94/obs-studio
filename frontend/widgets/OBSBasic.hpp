@@ -52,6 +52,7 @@ class OBSBasicAdvAudio;
 class OBSBasicFilters;
 class OBSBasicInteraction;
 class OBSBasicLayouts;
+class OBSBasicOverlays;
 class OBSBasicProjections;
 class OverlayManager;
 class ProjectionServer;
@@ -67,6 +68,7 @@ class VolumeControl;
 class YouTubeAppDock;
 #endif
 class QMessageBox;
+class QPushButton;
 class QWidgetAction;
 struct QuickTransition;
 
@@ -999,10 +1001,10 @@ private:
 
 	QPointer<OBSBasicProjections> projectionsDialog;
 	QPointer<ProjectionServer> projectionServer;
-	/* A plain pointer rather than a guard: QPointer needs the complete type,
-	 * and pulling the manager's header into this one would push it through
-	 * most of the frontend. Ownership is Qt's, through the parent. */
+	/* Owned by Qt through the parent, and outlives every window that reads
+	 * it, so a plain pointer says as much as a guard would. */
 	OverlayManager *overlayManager = nullptr;
+	QPointer<OBSBasicOverlays> overlaysDialog;
 	QPointer<QMenu> previewProjector;
 	QPointer<QMenu> previewProjectorSource;
 	QPointer<QMenu> previewProjectorMain;
@@ -1071,6 +1073,19 @@ signals:
 	void projectionsChanged();
 
 private:
+	QPushButton *OverlayButton(int index) const;
+
+	/* Gives the four presets their right-click menu, which is how a layer is
+	 * filled from what is selected in the preview. */
+	void SetupOverlayButtons();
+	void OverlayButtonMenu(int index, const QPoint &pos);
+	void OverlayToggled(int index, bool checked);
+
+	/* Hands a layer the selected source together with where it sits in the
+	 * preview, so a graphic is placed the ordinary way and then bound to a
+	 * preset. */
+	void SaveOverlayFromSelection(int index);
+
 private slots:
 	/* Auto-connected by name, so these have to be declared as slots. */
 	void on_overlayButton1_toggled(bool checked);

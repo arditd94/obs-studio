@@ -29,6 +29,8 @@ target_sources(
     dialogs/OBSBasicInteraction.hpp
     dialogs/OBSBasicLayouts.cpp
     dialogs/OBSBasicLayouts.hpp
+    dialogs/OBSBasicOverlays.cpp
+    dialogs/OBSBasicOverlays.hpp
     dialogs/OBSBasicProjections.cpp
     dialogs/OBSBasicProjections.hpp
     dialogs/OBSBasicProperties.cpp
