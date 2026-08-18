@@ -485,6 +485,11 @@ private:
 	QPointer<OBSDock> mixerDock;
 
 public:
+	/* Called by a scene dock whose scene has gone, so the dock is let go of
+	 * where it is owned instead of deleting itself out from under the list
+	 * that holds it. */
+	void DropSceneDock(SceneDock *dock);
+
 	void AddDockWidget(QDockWidget *dock, Qt::DockWidgetArea area, bool extraBrowser = false);
 	void RemoveDockWidget(const QString &name);
 	bool IsDockObjectNameUsed(const QString &name);

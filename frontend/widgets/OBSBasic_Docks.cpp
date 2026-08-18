@@ -335,6 +335,23 @@ void OBSBasic::RemoveSceneDock(const QString &uuid)
 	SaveSceneDocks();
 }
 
+void OBSBasic::DropSceneDock(SceneDock *dock)
+{
+	const int index = sceneDocks.indexOf(dock);
+
+	if (index >= 0) {
+		sceneDocks.removeAt(index);
+	}
+
+	/* Let go of it through the extra dock list, which holds the only owning
+	 * reference; deleting it here would leave that list to free it again.
+	 *
+	 * The saved set is deliberately left alone. A scene only goes missing
+	 * because the collection is being torn down or swapped, and the dock is
+	 * meant to come back with it. */
+	RemoveDockWidget(dock->objectName());
+}
+
 void OBSBasic::ToggleSceneDock(const QString &uuid)
 {
 	if (FindSceneDock(QT_TO_UTF8(uuid))) {

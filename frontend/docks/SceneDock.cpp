@@ -177,10 +177,24 @@ void SceneDock::SceneRenamed(void *param, calldata_t *data)
 void SceneDock::SceneRemoved(void *param, calldata_t *)
 {
 	SceneDock *window = static_cast<SceneDock *>(param);
+	OBSBasic *main = OBSBasic::Get();
 
-	/* Deleting from the Qt thread keeps the draw callback teardown on the
-	 * thread that created the display. */
-	QMetaObject::invokeMethod(window, "deleteLater");
+	/* Handed back to the main window rather than deleted here. The dock is
+	 * also held by the extra dock list, so deleting it outright leaves that
+	 * list to free the same widget a second time when the main window goes
+	 * down.
+	 *
+	 * Queued onto the main window, and guarded, because the signal arrives
+	 * on a libobs thread and the dock may be gone by the time it runs. That
+	 * also keeps the draw callback teardown on the thread that created the
+	 * display. */
+	QPointer<SceneDock> dock(window);
+
+	QMetaObject::invokeMethod(main, [main, dock]() {
+		if (dock) {
+			main->DropSceneDock(dock);
+		}
+	});
 }
 
 void SceneDock::HandleRename(const QString &name)
