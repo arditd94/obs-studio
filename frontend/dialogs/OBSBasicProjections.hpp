@@ -72,4 +72,5 @@ private slots:
 
 public:
 	explicit OBSBasicProjections(OBSBasic *parent);
+	~OBSBasicProjections();
 };

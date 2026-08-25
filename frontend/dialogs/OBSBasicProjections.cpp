@@ -41,7 +41,12 @@ OBSBasicProjections::OBSBasicProjections(OBSBasic *parent) : QDialog(parent), ma
 {
 	setWindowTitle(QTStr("Basic.Projections"));
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-	resize(720, 400);
+
+	/* Wide enough that the screen names, which carry a resolution and an
+	 * offset, are readable without dragging the edge on first open. */
+	resize(940, 460);
+	setSizeGripEnabled(true);
+	setMinimumSize(560, 320);
 
 	BuildUI();
 	Refresh();
@@ -50,6 +55,20 @@ OBSBasicProjections::OBSBasicProjections(OBSBasic *parent) : QDialog(parent), ma
 	/* The state also changes from the master button or from a projector
 	 * being dismissed, so the panel follows rather than owns it. */
 	connect(main, &OBSBasic::projectionsChanged, this, &OBSBasicProjections::Refresh);
+
+	/* Reopened at the size it was left, since it is resized once to suit a
+	 * desk and then opened again all through a show. */
+	const char *geometry = config_get_string(App()->GetUserConfig(), "BasicWindow", "ProjectionsGeometry");
+
+	if (geometry && *geometry) {
+		restoreGeometry(QByteArray::fromBase64(QByteArray(geometry)));
+	}
+}
+
+OBSBasicProjections::~OBSBasicProjections()
+{
+	config_set_string(App()->GetUserConfig(), "BasicWindow", "ProjectionsGeometry",
+			  saveGeometry().toBase64().constData());
 }
 
 void OBSBasicProjections::BuildUI()
@@ -59,8 +78,12 @@ void OBSBasicProjections::BuildUI()
 					  QTStr("Basic.Projections.Screen"), QTStr("Basic.Projections.On"),
 					  QTStr("Basic.Projections.Lock")});
 	table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-	table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+	/* The screen column carries the long text, a name with a resolution and
+	 * an offset, so it takes the slack while the scene column keeps a width
+	 * the user can drag. */
+	table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Interactive);
 	table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+	table->setColumnWidth(1, 220);
 	table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
 	table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
 	table->verticalHeader()->setVisible(false);
