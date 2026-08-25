@@ -1054,6 +1054,10 @@ public:
 	int ProjectionFadeDuration() const;
 	void SetProjectionFadeDuration(int ms);
 
+	/* Raises every line at once and starts the projections, so a set of
+	 * screens goes out on one press instead of one tick per line. */
+	void ProjectAllScreens();
+
 	void SetProjectionEnabled(int index, bool enabled);
 	void SetProjectionLocked(int index, bool locked);
 	void MoveProjectionEntry(int from, int to);

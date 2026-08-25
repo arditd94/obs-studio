@@ -79,9 +79,18 @@ void OBSBasicProjections::BuildUI()
 	connect(addButton, &QPushButton::clicked, this, &OBSBasicProjections::OnAdd);
 	connect(removeButton, &QPushButton::clicked, this, &OBSBasicProjections::OnRemove);
 
+	/* One press for the whole set, since a show usually goes out on every
+	 * screen at once and ticking each line is a chore under pressure. */
+	QPushButton *allButton = new QPushButton(QTStr("Basic.Projections.All"), this);
+	allButton->setToolTip(QTStr("Basic.Projections.All.Hint"));
+
+	connect(allButton, &QPushButton::clicked, this, [this]() { main->ProjectAllScreens(); });
+
 	QHBoxLayout *rowButtons = new QHBoxLayout();
 	rowButtons->addWidget(addButton);
 	rowButtons->addWidget(removeButton);
+	rowButtons->addSpacing(16);
+	rowButtons->addWidget(allButton);
 	rowButtons->addStretch();
 
 	fadeCombo = new QComboBox(this);

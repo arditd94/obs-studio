@@ -251,6 +251,12 @@ void ProjectionServer::HandleRequest(QTcpSocket *socket, const QString &request)
 		return;
 	}
 
+	if (path == "/all") {
+		main->ProjectAllScreens();
+		Respond(socket, 200, "application/json", StateJson());
+		return;
+	}
+
 	if (path == "/master") {
 		main->SetProjectionsRunning(on);
 		Respond(socket, 200, "application/json", StateJson());
@@ -333,6 +339,8 @@ QByteArray ProjectionServer::ControlPage()
  .master { width:100%; padding:16px; border-radius:12px; font-size:16px; font-weight:800;
            letter-spacing:.06em; background:var(--off); margin-bottom:18px; }
  .master.on { background:var(--live); }
+ .all { width:100%; padding:14px; border-radius:12px; font-size:15px; font-weight:800;
+        letter-spacing:.06em; background:var(--on); margin-bottom:18px; }
 
  .fade { background:var(--card); border-radius:14px; padding:14px 16px; margin-bottom:16px; }
  .fade h2 { font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--dim);
@@ -356,6 +364,7 @@ QByteArray ProjectionServer::ControlPage()
 <div id="main">
   <header><span id="dot"></span><h1>Proiezioni</h1></header>
   <button id="master" class="master" onclick="toggleMaster()">PROIEZIONE</button>
+  <button class="all" onclick="allScreens()">TUTTI GLI SCHERMI</button>
   <div class="fade"><h2>Dissolvenza</h2><div class="opts" id="fades"></div></div>
   <div id="screens"></div>
 </div>
@@ -485,6 +494,15 @@ function render(state, force) {
 function setFade(ms) {
   busy = true;
   api("/fade", {ms: ms})
+    .then(render)
+    .catch(() => { document.getElementById("dot").className = "bad"; })
+    .finally(() => { busy = false; });
+}
+
+function allScreens() {
+  if (!key || busy) return;
+  busy = true;
+  api("/all")
     .then(render)
     .catch(() => { document.getElementById("dot").className = "bad"; })
     .finally(() => { busy = false; });

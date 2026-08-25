@@ -453,6 +453,29 @@ void OBSBasic::SetProjectionFadeDuration(int ms)
 	emit projectionsChanged();
 }
 
+void OBSBasic::ProjectAllScreens()
+{
+	if (projectionEntries.isEmpty()) {
+		return;
+	}
+
+	for (ProjectionEntry &entry : projectionEntries) {
+		entry.enabled = true;
+	}
+
+	SaveProjections();
+
+	/* Through the button rather than the flag, so the local window and the
+	 * remote page cannot end up disagreeing about the master state. */
+	if (!projectionsRunning) {
+		ui->projectButton->setChecked(true);
+	} else {
+		RefreshProjections();
+	}
+
+	emit projectionsChanged();
+}
+
 void OBSBasic::SetProjectionEnabled(int index, bool enabled)
 {
 	if (index < 0 || index >= projectionEntries.size() || projectionEntries[index].enabled == enabled) {
