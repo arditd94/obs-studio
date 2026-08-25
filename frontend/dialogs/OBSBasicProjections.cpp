@@ -30,6 +30,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSet>
 #include <QTableWidget>
@@ -86,11 +87,17 @@ void OBSBasicProjections::BuildUI()
 
 	connect(allButton, &QPushButton::clicked, this, [this]() { main->ProjectAllScreens(); });
 
+	QPushButton *clearButton = new QPushButton(QTStr("Basic.Projections.Clear"), this);
+	clearButton->setToolTip(QTStr("Basic.Projections.Clear.Hint"));
+
+	connect(clearButton, &QPushButton::clicked, this, &OBSBasicProjections::OnClear);
+
 	QHBoxLayout *rowButtons = new QHBoxLayout();
 	rowButtons->addWidget(addButton);
 	rowButtons->addWidget(removeButton);
 	rowButtons->addSpacing(16);
 	rowButtons->addWidget(allButton);
+	rowButtons->addWidget(clearButton);
 	rowButtons->addStretch();
 
 	fadeCombo = new QComboBox(this);
@@ -453,6 +460,36 @@ void OBSBasicProjections::OnAdd()
 	main->AddProjectionEntry(entry);
 
 	table->selectRow(table->rowCount() - 1);
+}
+
+void OBSBasicProjections::OnClear()
+{
+	const int count = main->GetProjections().size();
+
+	if (!count) {
+		return;
+	}
+
+	/* Asked first: this throws away the setup for a whole show, and the
+	 * panel is meant to be reachable mid-event. */
+	const auto button =
+		OBSMessageBox::question(this, QTStr("Basic.Projections.Clear"),
+					QTStr("Basic.Projections.Clear.Confirm").arg(QString::number(count)));
+
+	if (button != QMessageBox::Yes) {
+		return;
+	}
+
+	const int removed = main->ClearProjectionEntries();
+	const int left = main->GetProjections().size();
+
+	/* A locked line stays, so say so rather than leaving the list looking
+	 * stubborn. */
+	if (left) {
+		OBSMessageBox::information(
+			this, QTStr("Basic.Projections.Clear"),
+			QTStr("Basic.Projections.Clear.Locked").arg(QString::number(removed), QString::number(left)));
+	}
 }
 
 void OBSBasicProjections::OnRemove()

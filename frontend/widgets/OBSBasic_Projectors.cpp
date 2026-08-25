@@ -476,6 +476,34 @@ void OBSBasic::ProjectAllScreens()
 	emit projectionsChanged();
 }
 
+int OBSBasic::ClearProjectionEntries()
+{
+	int removed = 0;
+
+	/* Backwards so the indices ahead of the one being dropped stay put. A
+	 * locked line survives: the lock exists so a stray press cannot take a
+	 * screen off air, and this is exactly such a press. */
+	for (int i = projectionEntries.size() - 1; i >= 0; i--) {
+		if (projectionEntries[i].locked) {
+			continue;
+		}
+
+		projectionEntries.removeAt(i);
+		removed++;
+	}
+
+	if (!removed) {
+		return 0;
+	}
+
+	SaveProjections();
+	RefreshProjections();
+
+	emit projectionsChanged();
+
+	return removed;
+}
+
 void OBSBasic::SetProjectionEnabled(int index, bool enabled)
 {
 	if (index < 0 || index >= projectionEntries.size() || projectionEntries[index].enabled == enabled) {

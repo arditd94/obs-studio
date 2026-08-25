@@ -67,6 +67,7 @@ protected:
 private slots:
 	void OnAdd();
 	void OnRemove();
+	void OnClear();
 	void OnRemoteToggled(bool on);
 
 public:

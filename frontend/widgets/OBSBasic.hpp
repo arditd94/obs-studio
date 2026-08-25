@@ -1058,6 +1058,10 @@ public:
 	 * screens goes out on one press instead of one tick per line. */
 	void ProjectAllScreens();
 
+	/* Empties the list, leaving locked lines where they are. Returns how
+	 * many were dropped, so the caller can say so. */
+	int ClearProjectionEntries();
+
 	void SetProjectionEnabled(int index, bool enabled);
 	void SetProjectionLocked(int index, bool locked);
 	void MoveProjectionEntry(int from, int to);
